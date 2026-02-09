@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { getApiUrl } from '../config/api';
@@ -223,7 +223,7 @@ export default function WindowDashboard() {
         console.log(`✅ Next queue response for Window ${windowNumber}:`, data);
         console.log(`📋 Current queue assigned: ${data.currentQueue?.queueNumber} at Window ${data.currentQueue?.currentWindow}`);
         console.log(`📊 Next queues count: ${data.nextQueues?.length || 0}`);
-        console.log(`📋 Next queue numbers:`, data.nextQueues?.map(q => q.queueNumber) || []);
+        console.log(`📋 Next queue numbers:`, data.nextQueues?.map((q: any) => q.queueNumber) || []);
         
         setCurrentQueue(data.currentQueue);
         setNextQueues(data.nextQueues || []);

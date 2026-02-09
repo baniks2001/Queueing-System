@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
 import { getApiUrl } from '../config/api';
 import { PencilIcon, TrashIcon, PlusIcon, KeyIcon, CheckIcon, NoSymbolIcon } from '@heroicons/react/24/outline';
 

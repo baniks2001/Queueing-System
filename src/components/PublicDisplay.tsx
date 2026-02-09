@@ -3,7 +3,7 @@ import { useQueue } from '../contexts/QueueContext';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { getApiUrl } from '../config/api';
-import { io, Socket } from 'socket.io-client';
+import { io } from 'socket.io-client';
 import {
   ArrowLeftIcon,
   ArrowsPointingOutIcon,

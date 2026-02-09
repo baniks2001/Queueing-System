@@ -11,108 +11,9 @@ import {
   XMarkIcon
 } from '@heroicons/react/24/outline';
 
-// Cross-browser compatibility utilities
-const getBrowserInfo = () => {
-  const userAgent = navigator.userAgent;
-  const isSmartTV = /SmartTV|WebOS|Tizen|Android.*TV/i.test(userAgent);
-  const isStockBrowser = /StockBrowser|NativeBrowser|TVBrowser/i.test(userAgent);
-  const isChrome = /Chrome/.test(userAgent);
-  const isFirefox = /Firefox/.test(userAgent);
-  const isSafari = /Safari/.test(userAgent) && !/Chrome/.test(userAgent);
-  
-  return {
-    userAgent,
-    isSmartTV,
-    isStockBrowser,
-    isChrome,
-    isFirefox,
-    isSafari,
-    supportsNotifications: 'Notification' in window,
-    supportsVibration: 'vibrate' in navigator,
-    supportsLocalStorage: 'localStorage' in window,
-    supportsSessionStorage: 'sessionStorage' in window
-  };
-};
 
-// Cross-browser localStorage with fallback
-const safeLocalStorage = {
-  getItem: (key: string) => {
-    try {
-      return window.localStorage ? localStorage.getItem(key) : null;
-    } catch (error) {
-      console.warn('localStorage not available:', error);
-      return null;
-    }
-  },
-  setItem: (key: string, value: string) => {
-    try {
-      if (window.localStorage) {
-        localStorage.setItem(key, value);
-      }
-    } catch (error) {
-      console.warn('localStorage not available:', error);
-    }
-  },
-  removeItem: (key: string) => {
-    try {
-      if (window.localStorage) {
-        localStorage.removeItem(key);
-      }
-    } catch (error) {
-      console.warn('localStorage not available:', error);
-    }
-  }
-};
 
-// Cross-browser fetch with timeout and retry
-const safeFetch = async (url: string, options: RequestInit = {}, retries: number = 3) => {
-  const browserInfo = getBrowserInfo();
-  
-  for (let i = 0; i < retries; i++) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), browserInfo.isSmartTV ? 10000 : 5000);
-      
-      const response = await fetch(url, {
-        ...options,
-        signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': browserInfo.userAgent,
-          ...options.headers
-        }
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      return response;
-    } catch (error) {
-      console.warn(`Fetch attempt ${i + 1} failed:`, error);
-      if (i === retries - 1) {
-        throw error;
-      }
-      // Wait before retry
-      await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
-    }
-  }
-  
-  throw new Error('All fetch attempts failed');
-};
 
-// Cross-browser navigation
-const safeNavigate = (navigate: any, path: string) => {
-  try {
-    navigate(path);
-  } catch (error) {
-    console.warn('Navigation error:', error);
-    // Fallback for smart TVs
-    window.location.href = path;
-  }
-};
 
 const PublicKiosk: React.FC = () => {
   const [selectedTransaction, setSelectedTransaction] = useState<string>('');
@@ -245,93 +146,95 @@ const PublicKiosk: React.FC = () => {
 
   const printQueue = (queue: any) => {
     const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Queue Number - ${queue.queueNumber}</title>
-          <style>
-            @page {
-              margin: 0;
-              size: A4;
-            }
-            body {
-              font-family: 'Arial', sans-serif;
-              margin: 0;
-              padding: 0;
-              background: white;
-            }
-            .queue-card { 
-              position: absolute;
-              top: 20px;
-              left: 20px;
-              width: 200px; /* Auto-fit width */
-              height: 120px; /* Auto-fit height */
-              border: 3px solid #1e40af; 
-              border-radius: 12px; 
-              padding: 15px; 
-              text-align: center; 
-              background: white;
-              box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-              display: flex;
-              flex-direction: column;
-              justify-content: center;
-              align-items: center;
-            }
-            .queue-number { 
-              font-size: 36px; 
-              font-weight: 700; 
-              color: #1e40af; 
-              margin-bottom: 8px;
-              letter-spacing: 2px;
-              line-height: 1;
-            }
-            .service-info { 
-              font-size: 14px; 
-              color: #6b7280; 
-              margin-bottom: 4px;
-              line-height: 1;
-            }
-            .person-type { 
-              font-size: 12px; 
-              color: #9ca3af; 
-              margin-bottom: 8px;
-              line-height: 1;
-            }
-            .timestamp { 
-              font-size: 10px; 
-              color: #d1d5db; 
-              margin-top: 4px;
-              line-height: 1;
-            }
-            @media print {
+    if (printWindow) {
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Queue Number - ${queue.queueNumber}</title>
+            <style>
+              @page {
+                margin: 0;
+                size: A4;
+              }
               body {
+                font-family: 'Arial', sans-serif;
                 margin: 0;
                 padding: 0;
+                background: white;
               }
-              .queue-card {
+              .queue-card { 
                 position: absolute;
                 top: 20px;
                 left: 20px;
-                margin: 0;
-                page-break-inside: avoid;
-                break-inside: avoid;
+                width: 200px; /* Auto-fit width */
+                height: 120px; /* Auto-fit height */
+                border: 3px solid #1e40af; 
+                border-radius: 12px; 
+                padding: 15px; 
+                text-align: center; 
+                background: white;
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
               }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="queue-card">
-            <div class="queue-number">${queue.queueNumber}</div>
-            <div class="service-info">${queue.service}</div>
-            <div class="person-type">${queue.personType}</div>
-            <div class="timestamp">${new Date().toLocaleString()}</div>
-          </div>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
+              .queue-number { 
+                font-size: 36px; 
+                font-weight: 700; 
+                color: #1e40af; 
+                margin-bottom: 8px;
+                letter-spacing: 2px;
+                line-height: 1;
+              }
+              .service-info { 
+                font-size: 14px; 
+                color: #6b7280; 
+                margin-bottom: 4px;
+                line-height: 1;
+              }
+              .person-type { 
+                font-size: 12px; 
+                color: #9ca3af; 
+                margin-bottom: 8px;
+                line-height: 1;
+              }
+              .timestamp { 
+                font-size: 10px; 
+                color: #d1d5db; 
+                margin-top: 4px;
+                line-height: 1;
+              }
+              @media print {
+                body {
+                  margin: 0;
+                  padding: 0;
+                }
+                .queue-card {
+                  position: absolute;
+                  top: 20px;
+                  left: 20px;
+                  margin: 0;
+                  page-break-inside: avoid;
+                  break-inside: avoid;
+                }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="queue-card">
+              <div class="queue-number">${queue.queueNumber}</div>
+              <div class="service-info">${queue.service}</div>
+              <div class="person-type">${queue.personType}</div>
+              <div class="timestamp">${new Date().toLocaleString()}</div>
+            </div>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.print();
+    }
   };
 
   return (
