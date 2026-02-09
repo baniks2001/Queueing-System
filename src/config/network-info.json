@@ -1,0 +1,9 @@
+{
+  "note": "This file is now managed by centralized CONFIG in app-config.ts",
+  "detectedIP": "auto-detected",
+  "frontendUrl": "auto-generated",
+  "backendUrl": "auto-generated", 
+  "socketUrl": "auto-generated",
+  "timestamp": "2026-02-08T05:56:10.692Z",
+  "configuration": "All URLs are now automatically generated from .env via CONFIG"
+}
