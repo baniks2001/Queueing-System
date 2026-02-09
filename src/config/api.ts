@@ -42,7 +42,7 @@ export const getApiUrl = (endpoint: string): string => {
 
 // Helper function to get socket URL
 export const getSocketUrl = (): string => {
-  const socketUrl = CONFIG.WS_URL;
+  const socketUrl = API_CONFIG.getServerUrl();
   
   // Debug logging
   console.log('🔌 Socket URL:', socketUrl);

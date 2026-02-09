@@ -1,39 +1,7 @@
 // Centralized configuration that automatically syncs with .env
 export const CONFIG = {
-  // API Configuration - automatically reads from .env and adjusts for environment
+  // API Configuration - automatically reads from .env
   get API_URL(): string {
-    // Check if we're in production (HTTPS) or development
-    const isProduction = window.location.protocol === 'https:';
-    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    
-    // For production deployment on Vercel
-    if (isProduction && !isLocalhost) {
-      const envUrl = import.meta.env.VITE_API_URL;
-      
-      // If environment variable is set and is a valid URL
-      if (envUrl && envUrl.startsWith('http')) {
-        // Ensure it's HTTPS for production
-        if (envUrl.startsWith('http://')) {
-          return envUrl.replace('http://', 'https://');
-        }
-        return envUrl;
-      }
-      
-      // If no valid env URL, try to construct from current domain
-      // This assumes backend is deployed at same domain with different path/port
-      console.warn('⚠️ No valid VITE_API_URL found in production. Using fallback configuration.');
-      
-      // Common production backend patterns
-      const possibleUrls = [
-        `https://${window.location.hostname}:5000`, // Same domain, different port
-        `https://api.${window.location.hostname}`,   // API subdomain
-        `https://${window.location.hostname}/api`,   // API path
-      ];
-      
-      return possibleUrls[0]; // Return first option as fallback
-    }
-    
-    // For development, use the .env file value
     return import.meta.env.VITE_API_URL || 'http://localhost:5000';
   },
   
@@ -78,17 +46,6 @@ export const CONFIG = {
     return this.API_URL;
   },
   
-  // Get WebSocket URL with proper protocol (ws:// or wss://)
-  get WS_URL(): string {
-    const apiUrl = this.API_URL;
-    if (apiUrl.startsWith('https://')) {
-      return apiUrl.replace('https://', 'wss://');
-    } else if (apiUrl.startsWith('http://')) {
-      return apiUrl.replace('http://', 'ws://');
-    }
-    return apiUrl;
-  },
-  
   // Frontend URLs
   get FRONTEND_URL(): string {
     return `http://${this.FRONTEND_HOST}:${this.FRONTEND_PORT}`;
@@ -113,10 +70,7 @@ export const CONFIG = {
       BACKEND_PORT: this.BACKEND_PORT,
       API_BASE: this.API_BASE,
       SOCKET_URL: this.SOCKET_URL,
-      WS_URL: this.WS_URL,
-      FRONTEND_URL: this.FRONTEND_URL,
-      isProduction: window.location.protocol === 'https:',
-      currentHostname: window.location.hostname
+      FRONTEND_URL: this.FRONTEND_URL
     };
   }
 };

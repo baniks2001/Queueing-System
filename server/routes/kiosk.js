@@ -132,11 +132,9 @@ router.post('/close', authMiddleware, async (req, res) => {
     );
     console.log('🔧 Transaction history created/updated');
     
-    // Delete completed queues to reset for next session
-    await Queue.deleteMany({ 
-      status: { $in: ['completed', 'missed'] }
-    });
-    console.log('🔧 Completed queues deleted');
+    // Delete ALL queues to reset for next session
+    await Queue.deleteMany({});
+    console.log('🔧 All queues deleted for reset');
     
     // Reset queue counter
     const lastQueue = await Queue.findOne().sort({ queueNumber: -1 });

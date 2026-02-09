@@ -66,23 +66,20 @@ router.get('/admins', authMiddleware, adminMiddleware, async (req, res) => {
 
 router.post('/admin', authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    const { username, email, password, role } = req.body;
+    const { username, password, role } = req.body;
 
     if (req.userId !== 'super-admin' && role === 'super_admin') {
       return res.status(403).json({ message: 'Only super admin can create super admin accounts' });
     }
 
-    const existingUser = await User.findOne({
-      $or: [{ username }, { email }]
-    });
+    const existingUser = await User.findOne({ username });
 
     if (existingUser) {
-      return res.status(400).json({ message: 'Username or email already exists' });
+      return res.status(400).json({ message: 'Username already exists' });
     }
 
     const newAdmin = new User({
       username,
-      email,
       password,
       role: role || 'admin'
     });
@@ -94,7 +91,6 @@ router.post('/admin', authMiddleware, adminMiddleware, async (req, res) => {
       admin: {
         id: newAdmin._id,
         username: newAdmin.username,
-        email: newAdmin.email,
         role: newAdmin.role,
         isActive: newAdmin.isActive
       }
@@ -108,7 +104,7 @@ router.post('/admin', authMiddleware, adminMiddleware, async (req, res) => {
 router.put('/admin/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    const { username, email, role, isActive } = req.body;
+    const { username, role, isActive } = req.body;
 
     if (req.userId !== 'super-admin' && role === 'super_admin') {
       return res.status(403).json({ message: 'Only super admin can assign super admin role' });
@@ -127,7 +123,6 @@ router.put('/admin/:id', authMiddleware, adminMiddleware, async (req, res) => {
     }
 
     user.username = username;
-    user.email = email;
     user.role = role;
     user.isActive = isActive;
 
@@ -138,7 +133,6 @@ router.put('/admin/:id', authMiddleware, adminMiddleware, async (req, res) => {
       admin: {
         id: user._id,
         username: user.username,
-        email: user.email,
         role: user.role,
         isActive: user.isActive
       }

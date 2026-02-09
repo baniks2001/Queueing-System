@@ -9,13 +9,6 @@ const adminSchema = new mongoose.Schema({
     minlength: 3,
     maxlength: 50
   },
-  email: {
-    type: String,
-    required: true,
-    unique: true,
-    trim: true,
-    lowercase: true
-  },
   password: {
     type: String,
     required: true,
@@ -42,9 +35,8 @@ const adminSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Add index for username and email
+// Add index for username
 adminSchema.index({ username: 1 });
-adminSchema.index({ email: 1 });
 
 // Pre-save middleware to hash password
 adminSchema.pre('save', async function(next) {

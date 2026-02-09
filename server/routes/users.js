@@ -7,6 +7,10 @@ const Admin = require('../models/Admin');
 const Service = require('../models/Service');
 const router = express.Router();
 
+// Debug: Check User schema
+console.log('🔍 User Schema fields:', Object.keys(User.schema.paths));
+console.log('🔍 User Schema required fields:', Object.keys(User.schema.paths).filter(key => User.schema.paths[key].isRequired));
+
 const authMiddleware = async (req, res, next) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
@@ -63,16 +67,14 @@ router.get('/all-users', authMiddleware, adminMiddleware, async (req, res) => {
 // Create admin user
 router.post('/admin-user', authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    const { username, email, password, role, windowNumber, service } = req.body;
+    const { username, password, role, windowNumber, service } = req.body;
 
-    console.log('Creating admin/table user:', { username, email, role, windowNumber, service });
+    console.log('Creating admin/table user:', { username, role, windowNumber, service });
 
-    const existingUser = await User.findOne({
-      $or: [{ username }, { email }]
-    });
+    const existingUser = await User.findOne({ username });
 
     if (existingUser) {
-      return res.status(400).json({ message: 'Username or email already exists' });
+      return res.status(400).json({ message: 'Username already exists' });
     }
 
     // Validate required fields based on role
@@ -82,7 +84,6 @@ router.post('/admin-user', authMiddleware, adminMiddleware, async (req, res) => 
 
     const newUser = new User({
       username,
-      email,
       password, // Will be hashed by pre-save middleware
       role: role || 'admin',
       windowNumber: role === 'window' || role === 'table' ? windowNumber : undefined,
@@ -96,7 +97,6 @@ router.post('/admin-user', authMiddleware, adminMiddleware, async (req, res) => 
       user: {
         id: newUser._id,
         username: newUser.username,
-        email: newUser.email,
         role: newUser.role,
         windowNumber: newUser.windowNumber,
         service: newUser.service,
@@ -153,7 +153,6 @@ router.put('/update-status/:id', authMiddleware, adminMiddleware, async (req, re
       user: {
         id: user._id,
         username: user.username,
-        email: user.email,
         role: user.role,
         isActive: user.isActive
       }
@@ -198,45 +197,94 @@ router.get('/window-users', authMiddleware, adminMiddleware, async (req, res) =>
   }
 });
 
+// Public endpoint for window users (no authentication required)
+router.get('/window-users/public', async (req, res) => {
+  try {
+    const windowUsers = await User.find({ 
+      role: 'window',
+      isActive: true 
+    })
+      .select('-password')
+      .sort({ windowNumber: 1 });
+
+    res.json(windowUsers);
+  } catch (error) {
+    console.error('Get public window users error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 router.post('/window-user', authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    const { username, email, password, windowNumber, service } = req.body;
+    console.log('🔍 Creating window user with data:', req.body);
+    const { username, password, windowNumber, service } = req.body;
 
-    const existingUser = await User.findOne({
-      $or: [{ username }, { email }]
-    });
-
-    if (existingUser) {
-      return res.status(400).json({ message: 'Username or email already exists' });
+    // Validate required fields
+    if (!username || !password || !windowNumber || !service) {
+      console.log('❌ Missing required fields:', { username: !!username, password: !!password, windowNumber: !!windowNumber, service: !!service });
+      return res.status(400).json({ message: 'Username, password, window number, and service are required' });
     }
 
+    console.log('🔍 Starting user creation process...');
+
+    // Clean up existing documents that might have email field (migration)
+    try {
+      await User.updateMany(
+        { email: { $exists: true } },
+        { $unset: { email: 1 } }
+      );
+      console.log('🧹 Cleaned up email field from existing users');
+    } catch (cleanupError) {
+      console.log('⚠️ Email cleanup failed (non-critical):', cleanupError.message);
+    }
+
+    // Check if user exists
+    const existingUser = await User.findOne({ username });
+    if (existingUser) {
+      console.log('❌ Username already exists:', username);
+      return res.status(400).json({ message: 'Username already exists' });
+    }
+
+    // Check if window number already assigned
     const existingWindow = await User.findOne({ windowNumber });
     if (existingWindow) {
       return res.status(400).json({ message: 'Window number already assigned' });
     }
 
+    // Validate service exists
+    console.log('🔍 Looking for service:', service);
     const serviceDoc = await Service.findOne({ name: service });
+    console.log('🔍 Service found:', serviceDoc);
     if (!serviceDoc) {
+      console.log('❌ Service not found:', service);
       return res.status(400).json({ message: 'Service not found' });
     }
 
+    // Create user without email field
     const newUser = new User({
       username,
-      email,
       password,
       role: 'window',
       windowNumber,
       service
     });
 
+    console.log('🔍 Creating new user object:', {
+      username: newUser.username,
+      role: newUser.role,
+      windowNumber: newUser.windowNumber,
+      service: newUser.service
+    });
+
+    console.log('🔍 Attempting to save user...');
     await newUser.save();
+    console.log('✅ Window user created successfully:', newUser._id);
 
     res.status(201).json({
       message: 'Window user created successfully',
       user: {
         id: newUser._id,
         username: newUser.username,
-        email: newUser.email,
         role: newUser.role,
         windowNumber: newUser.windowNumber,
         service: newUser.service,
@@ -244,15 +292,32 @@ router.post('/window-user', authMiddleware, adminMiddleware, async (req, res) =>
       }
     });
   } catch (error) {
-    console.error('Create window user error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('❌ Create window user error details:', {
+      name: error.name,
+      message: error.message,
+      errors: error.errors,
+      stack: error.stack
+    });
+    
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({ 
+        message: 'Validation failed', 
+        errors: validationErrors 
+      });
+    }
+    
+    res.status(500).json({ 
+      message: 'Server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
 router.put('/window-user/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    const { username, email, windowNumber, service, isActive } = req.body;
+    const { username, windowNumber, service, isActive } = req.body;
 
     const user = await User.findById(id);
     if (!user) {
@@ -274,7 +339,6 @@ router.put('/window-user/:id', authMiddleware, adminMiddleware, async (req, res)
     }
 
     user.username = username;
-    user.email = email;
     user.windowNumber = windowNumber;
     user.service = service;
     user.isActive = isActive;
@@ -286,7 +350,6 @@ router.put('/window-user/:id', authMiddleware, adminMiddleware, async (req, res)
       user: {
         id: user._id,
         username: user.username,
-        email: user.email,
         role: user.role,
         windowNumber: user.windowNumber,
         service: user.service,
@@ -349,30 +412,33 @@ router.get('/admins', authMiddleware, async (req, res) => {
 router.post('/admins', authMiddleware, async (req, res) => {
   try {
     console.log('Creating admin:', req.body);
-    const { username, email, password, role = 'admin' } = req.body;
+    const { username, password, role = 'admin' } = req.body;
+
+    // Clean up existing documents that might have email field (migration)
+    try {
+      await Admin.updateMany(
+        { email: { $exists: true } },
+        { $unset: { email: 1 } }
+      );
+      console.log('🧹 Cleaned up email field from existing admins');
+    } catch (cleanupError) {
+      console.log('⚠️ Admin email cleanup failed (non-critical):', cleanupError.message);
+    }
 
     // Validate required fields
-    if (!username || !email || !password) {
-      return res.status(400).json({ message: 'Username, email, and password are required' });
+    if (!username || !password) {
+      return res.status(400).json({ message: 'Username and password are required' });
     }
 
     // Check if admin already exists
-    const existingAdmin = await Admin.findOne({
-      $or: [{ username }, { email }]
-    });
+    const existingAdmin = await Admin.findOne({ username });
 
     if (existingAdmin) {
-      if (existingAdmin.username === username) {
-        return res.status(400).json({ message: 'Username already exists' });
-      }
-      if (existingAdmin.email === email) {
-        return res.status(400).json({ message: 'Email already exists' });
-      }
+      return res.status(400).json({ message: 'Username already exists' });
     }
 
     const admin = new Admin({
       username,
-      email,
       password,
       role
     });
@@ -398,11 +464,11 @@ router.post('/admins', authMiddleware, async (req, res) => {
 router.put('/admins/:id', authMiddleware, async (req, res) => {
   try {
     console.log('Updating admin:', req.params.id, req.body);
-    const { username, email, role, isActive } = req.body;
+    const { username, role, isActive } = req.body;
 
     const admin = await Admin.findByIdAndUpdate(
       req.params.id,
-      { username, email, role, isActive },
+      { username, role, isActive },
       { new: true, runValidators: true }
     ).select('-password');
 

@@ -5,7 +5,6 @@ import { PencilIcon, TrashIcon, PlusIcon, KeyIcon, CheckIcon, NoSymbolIcon } fro
 interface User {
   _id: string;
   username: string;
-  email: string;
   role: 'window' | 'table';
   windowNumber?: number;
   service?: string;
@@ -20,7 +19,6 @@ const UserManagement: React.FC = () => {
   const [passwordUser, setPasswordUser] = useState<User | null>(null);
   const [formData, setFormData] = useState({
     username: '',
-    email: '',
     password: '',
     role: 'window' as 'window' | 'table',
     windowNumber: 1,
@@ -102,7 +100,6 @@ const UserManagement: React.FC = () => {
         setEditingUser(null);
         setFormData({
           username: '',
-          email: '',
           password: '',
           role: 'window',
           windowNumber: 1,
@@ -122,7 +119,6 @@ const UserManagement: React.FC = () => {
     setEditingUser(user);
     setFormData({
       username: user.username,
-      email: user.email,
       password: '',
       role: user.role,
       windowNumber: user.windowNumber || 1,
@@ -216,7 +212,6 @@ const UserManagement: React.FC = () => {
     setEditingUser(null);
     setFormData({
       username: '',
-      email: '',
       password: '',
       role: 'window',
       windowNumber: 1,
@@ -249,7 +244,6 @@ const UserManagement: React.FC = () => {
             <thead>
               <tr className="border-b border-gray-200">
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">Username</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Email</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">Role</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">
                   {users.some(u => u.role === 'table') ? 'Window/Table Number' : 'Window Number'}
@@ -263,7 +257,6 @@ const UserManagement: React.FC = () => {
               {users.map((user) => (
                 <tr key={user._id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="py-3 px-4">{user.username}</td>
-                  <td className="py-3 px-4">{user.email}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                       user.role === 'table' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
@@ -362,16 +355,6 @@ const UserManagement: React.FC = () => {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  className="input-field"
-                  required
-                />
-              </div>
 
               {!editingUser && (
                 <div>

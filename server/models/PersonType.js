@@ -11,9 +11,21 @@ const personTypeSchema = new mongoose.Schema({
     trim: true
   },
   priority: {
-    type: String,
-    enum: ['Low', 'High'],
-    default: 'Low'
+    type: mongoose.Schema.Types.Mixed,
+    default: 0,
+    validate: {
+      validator: function(value) {
+        // Allow both numbers and strings, convert to number
+        const numValue = typeof value === 'string' ? 
+          value.toLowerCase() === 'low' ? 0 :
+          value.toLowerCase() === 'medium' ? 5 :
+          value.toLowerCase() === 'high' ? 9 :
+          parseInt(value) : value;
+        
+        return !isNaN(numValue) && numValue >= 0 && numValue <= 10;
+      },
+      message: 'Priority must be between 0 and 10'
+    }
   },
   color: {
     type: String,

@@ -20,7 +20,20 @@ const PublicDisplay: React.FC = () => {
   const [kioskTitle, setKioskTitle] = useState('Queue Management System');
   const [announcedQueues, setAnnouncedQueues] = useState<Set<string>>(new Set());
   const [repeatAnnouncementTracker, setRepeatAnnouncementTracker] = useState<Set<string>>(new Set());
+  const [windowUsers, setWindowUsers] = useState<any[]>([]);
   const navigate = useNavigate();
+
+  // Fetch window users from database
+  const fetchWindowUsers = async () => {
+    try {
+      const response = await axios.get(getApiUrl('/api/users/window-users/public'));
+      if (response.data) {
+        setWindowUsers(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching window users:', error);
+    }
+  };
 
   // Play AI-like synthetic sound notification
   const playSound = () => {
@@ -161,7 +174,11 @@ const PublicDisplay: React.FC = () => {
 
   useEffect(() => {
     fetchKioskTitle();
-    const interval = setInterval(fetchKioskTitle, 30000);
+    fetchWindowUsers();
+    const interval = setInterval(() => {
+      fetchKioskTitle();
+      fetchWindowUsers();
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -425,140 +442,92 @@ const PublicDisplay: React.FC = () => {
                   Window Status
                 </h3>
                 
-                {/* First Row - Windows 1-3 */}
-                <div className="grid grid-cols-3 gap-4 sm:gap-6 lg:gap-8 mb-4 sm:mb-6">
-                  {[1, 2, 3].map((windowNumber) => {
-                    const currentQueue = currentQueues.find(q => q.currentWindow === windowNumber);
-                    const isServing = currentQueue && currentQueue.status === 'serving';
+                {/* Dynamic Window Status - Show windows from database */}
+                <div className="space-y-4 sm:space-y-6">
+                  {(() => {
+                    const activeWindows = windowUsers
+                      .filter(user => user.isActive && user.windowNumber)
+                      .sort((a, b) => (a.windowNumber || 0) - (b.windowNumber || 0));
+                    
+                    // Auto-resize grid based on number of windows
+                    const windowCount = activeWindows.length;
+                    let gridCols = 'grid-cols-2';
+                    if (windowCount <= 2) gridCols = 'grid-cols-1 sm:grid-cols-2';
+                    else if (windowCount <= 3) gridCols = 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
+                    else if (windowCount <= 4) gridCols = 'grid-cols-2 lg:grid-cols-4';
+                    else gridCols = 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5';
                     
                     return (
-                      <div
-                        key={windowNumber}
-                        className={`relative overflow-hidden rounded-lg p-6 sm:p-8 lg:p-10 transition-all duration-300 transform hover:scale-105 border-2 flex flex-col justify-center items-center min-h-[180px] sm:min-h-[200px] lg:min-h-[240px] ${
-                          isServing
-                            ? 'bg-blue-50 border-blue-500 shadow-lg'
-                            : 'bg-gray-50 border-gray-300'
-                        }`}
-                      >
-                        {/* Window Number */}
-                        <div className="text-center mb-3 sm:mb-4">
-                          <div className={`text-lg sm:text-xl lg:text-2xl font-bold uppercase tracking-wide ${
-                            isServing ? 'text-blue-600' : 'text-gray-600'
-                          }`}>
-                            Window {windowNumber}
-                          </div>
-                        </div>
-                        
-                        {/* Queue Number - Much Bigger */}
-                        <div className="text-center flex-1 flex items-center justify-center">
-                          {isServing ? (
-                            <div className="font-black text-blue-600"
-                              style={{
-                                fontSize: 'clamp(2.5rem, 5vw, 4rem)',
-                                letterSpacing: '0.01em',
-                                lineHeight: '1',
-                                fontWeight: '900'
-                              }}
+                      <div className={`grid ${gridCols} gap-4 sm:gap-6 lg:gap-8`}>
+                        {activeWindows.map((windowUser) => {
+                          const windowNumber = windowUser.windowNumber;
+                          const currentQueue = currentQueues.find(q => q.currentWindow === windowNumber);
+                          const isServing = currentQueue && currentQueue.status === 'serving';
+                          
+                          return (
+                            <div
+                              key={windowUser._id}
+                              className={`relative overflow-hidden rounded-xl p-6 sm:p-8 lg:p-10 transition-all duration-300 transform hover:scale-105 border-2 flex flex-col justify-center items-center min-h-[180px] sm:min-h-[200px] lg:min-h-[240px] ${
+                                isServing
+                                  ? 'bg-blue-50 border-blue-500 shadow-lg'
+                                  : 'bg-gray-50 border-gray-300'
+                              }`}
                             >
-                              {currentQueue.queueNumber}
+                              {/* Window Number */}
+                              <div className="text-center mb-3 sm:mb-4">
+                                <div className={`text-lg sm:text-xl lg:text-2xl font-bold uppercase tracking-wide ${
+                                  isServing ? 'text-blue-600' : 'text-gray-600'
+                                }`}>
+                                  Window {windowNumber}
+                                </div>
+                              </div>
+                              
+                              {/* Queue Number - Large and Visible */}
+                              <div className="text-center flex-1 flex items-center justify-center">
+                                {isServing ? (
+                                  <div className="font-black text-blue-600"
+                                    style={{
+                                      fontSize: windowCount <= 3 ? 'clamp(3rem, 6vw, 4.5rem)' : 'clamp(2.5rem, 5vw, 4rem)',
+                                      letterSpacing: '0.01em',
+                                      lineHeight: '1',
+                                      fontWeight: '900',
+                                      textShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                                    }}
+                                  >
+                                    {currentQueue.queueNumber}
+                                  </div>
+                                ) : (
+                                  <div className="font-bold text-gray-700"
+                                    style={{
+                                      fontSize: windowCount <= 3 ? 'clamp(2.5rem, 5vw, 3.5rem)' : 'clamp(2rem, 4vw, 3rem)',
+                                      letterSpacing: '0.01em',
+                                      lineHeight: '1'
+                                    }}
+                                  >
+                                    ---
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {/* Status */}
+                              <div className="text-center mt-3 sm:mb-4">
+                                <div className={`text-lg sm:text-xl lg:text-2xl font-bold ${
+                                  isServing ? 'text-blue-500' : 'text-gray-500'
+                                }`}>
+                                  {isServing ? 'Now Serving' : 'Available'}
+                                </div>
+                              </div>
+                              
+                              {/* Border Indicator for Active Windows */}
+                              {isServing && (
+                                <div className="absolute top-0 left-0 right-0 h-4 bg-blue-500 rounded-t-xl" />
+                              )}
                             </div>
-                          ) : (
-                            <div className="font-bold text-gray-700"
-                              style={{
-                                fontSize: 'clamp(2rem, 4.5vw, 3.5rem)',
-                                letterSpacing: '0.01em',
-                                lineHeight: '1'
-                              }}
-                            >
-                              ---
-                            </div>
-                          )}
-                        </div>
-                        
-                        {/* Status */}
-                        <div className="text-center mt-3 sm:mb-4">
-                          <div className={`text-lg sm:text-xl lg:text-2xl font-bold ${
-                            isServing ? 'text-blue-500' : 'text-gray-500'
-                          }`}>
-                            {isServing ? 'Now Serving' : 'Available'}
-                          </div>
-                        </div>
-                        
-                        {/* Simple Border Indicator for Active Windows */}
-                        {isServing && (
-                          <div className="absolute top-0 left-0 right-0 h-4 bg-blue-500 rounded-t-lg" />
-                        )}
+                          );
+                        })}
                       </div>
                     );
-                  })}
-                </div>
-                
-                {/* Second Row - Windows 4-5 */}
-                <div className="grid grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
-                  {[4, 5].map((windowNumber) => {
-                    const currentQueue = currentQueues.find(q => q.currentWindow === windowNumber);
-                    const isServing = currentQueue && currentQueue.status === 'serving';
-                    
-                    return (
-                      <div
-                        key={windowNumber}
-                        className={`relative overflow-hidden rounded-lg p-6 sm:p-8 lg:p-10 transition-all duration-300 transform hover:scale-105 border-2 flex flex-col justify-center items-center min-h-[180px] sm:min-h-[200px] lg:min-h-[240px] ${
-                          isServing
-                            ? 'bg-blue-50 border-blue-500 shadow-lg'
-                            : 'bg-gray-50 border-gray-300'
-                        }`}
-                      >
-                        {/* Window Number */}
-                        <div className="text-center mb-3 sm:mb-4">
-                          <div className={`text-lg sm:text-xl lg:text-2xl font-bold uppercase tracking-wide ${
-                            isServing ? 'text-blue-600' : 'text-gray-600'
-                          }`}>
-                            Window {windowNumber}
-                          </div>
-                        </div>
-                        
-                        {/* Queue Number - Much Bigger */}
-                        <div className="text-center flex-1 flex items-center justify-center">
-                          {isServing ? (
-                            <div className="font-black text-blue-600"
-                              style={{
-                                fontSize: 'clamp(2.5rem, 5vw, 4rem)',
-                                letterSpacing: '0.01em',
-                                lineHeight: '1',
-                                fontWeight: '900'
-                              }}
-                            >
-                              {currentQueue.queueNumber}
-                            </div>
-                          ) : (
-                            <div className="font-bold text-gray-700"
-                              style={{
-                                fontSize: 'clamp(2rem, 4.5vw, 3.5rem)',
-                                letterSpacing: '0.01em',
-                                lineHeight: '1'
-                              }}
-                            >
-                              ---
-                            </div>
-                          )}
-                        </div>
-                        
-                        {/* Status */}
-                        <div className="text-center mt-3 sm:mb-4">
-                          <div className={`text-lg sm:text-xl lg:text-2xl font-bold ${
-                            isServing ? 'text-blue-500' : 'text-gray-500'
-                          }`}>
-                            {isServing ? 'Now Serving' : 'Available'}
-                          </div>
-                        </div>
-                        
-                        {/* Simple Border Indicator for Active Windows */}
-                        {isServing && (
-                          <div className="absolute top-0 left-0 right-0 h-4 bg-blue-500 rounded-t-lg" />
-                        )}
-                      </div>
-                    );
-                  })}
+                  })()}
                 </div>
               </div>
             </div>
@@ -610,7 +579,7 @@ const PublicDisplay: React.FC = () => {
                   
                   {/* Queue Items */}
                   {(() => {
-                    const queues = getAllQueuesByPosition().slice(0, 6);
+                    const queues = getAllQueuesByPosition().slice(0, 10);
                     console.log('🔍 Debug - Queues to render:', queues);
                     console.log('🔍 Debug - Queues length:', queues.length);
                     

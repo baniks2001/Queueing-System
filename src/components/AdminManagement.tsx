@@ -12,7 +12,6 @@ import {
 interface Admin {
   _id: string;
   username: string;
-  email: string;
   role: 'admin' | 'super_admin';
   isActive: boolean;
   createdAt: string;
@@ -24,7 +23,6 @@ const AdminManagement: React.FC = () => {
   const [editingAdmin, setEditingAdmin] = useState<Admin | null>(null);
   const [formData, setFormData] = useState({
     username: '',
-    email: '',
     password: '',
     role: 'admin' as 'admin' | 'super_admin'
   });
@@ -76,7 +74,7 @@ const AdminManagement: React.FC = () => {
       });
 
       if (response.ok) {
-        setFormData({ username: '', email: '', password: '', role: 'admin' });
+        setFormData({ username: '', password: '', role: 'admin' });
         setIsModalOpen(false);
         fetchAdmins();
       } else {
@@ -93,7 +91,6 @@ const AdminManagement: React.FC = () => {
     setEditingAdmin(admin);
     setFormData({
       username: admin.username,
-      email: admin.email,
       password: '',
       role: admin.role as 'admin' | 'super_admin'
     });
@@ -118,7 +115,7 @@ const AdminManagement: React.FC = () => {
       });
 
       if (response.ok) {
-        setFormData({ username: '', email: '', password: '', role: 'admin' });
+        setFormData({ username: '', password: '', role: 'admin' });
         setIsModalOpen(false);
         setEditingAdmin(null);
         fetchAdmins();
@@ -221,9 +218,6 @@ const AdminManagement: React.FC = () => {
                         Username
                       </th>
                       <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Email
-                      </th>
-                      <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Role
                       </th>
                       <th className="px-3 sm:px-4 lg:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -243,12 +237,10 @@ const AdminManagement: React.FC = () => {
                         <td className="px-3 sm:px-4 lg:px-6 py-2 sm:py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           <div className="sm:hidden">
                             <div className="font-medium">{admin.username}</div>
-                            <div className="text-xs text-gray-500">{admin.email}</div>
                           </div>
                           <span className="hidden sm:inline">{admin.username}</span>
                         </td>
                         <td className="hidden sm:table-cell px-3 sm:px-4 lg:px-6 py-2 sm:py-4 whitespace-nowrap text-sm text-gray-500">
-                          {admin.email}
                         </td>
                         <td className="px-3 sm:px-4 lg:px-6 py-2 sm:py-4 whitespace-nowrap text-sm">
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -321,7 +313,7 @@ const AdminManagement: React.FC = () => {
                   onClick={() => {
                     setIsModalOpen(false);
                     setEditingAdmin(null);
-                    setFormData({ username: '', email: '', password: '', role: 'admin' });
+                    setFormData({ username: '', password: '', role: 'admin' });
                   }}
                   className="text-gray-400 hover:text-gray-600 p-1"
                 >
@@ -346,19 +338,6 @@ const AdminManagement: React.FC = () => {
                   />
                 </div>
 
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    id="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    required
-                  />
-                </div>
 
                 <div>
                   <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
@@ -396,7 +375,7 @@ const AdminManagement: React.FC = () => {
                     onClick={() => {
                       setIsModalOpen(false);
                       setEditingAdmin(null);
-                      setFormData({ username: '', email: '', password: '', role: 'admin' });
+                      setFormData({ username: '', password: '', role: 'admin' });
                     }}
                     className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 text-sm"
                   >
