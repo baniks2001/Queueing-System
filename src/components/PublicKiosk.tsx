@@ -11,13 +11,117 @@ import {
   XMarkIcon
 } from '@heroicons/react/24/outline';
 
+// Cross-browser compatibility utilities
+const getBrowserInfo = () => {
+  const userAgent = navigator.userAgent;
+  const isSmartTV = /SmartTV|WebOS|Tizen|Android.*TV/i.test(userAgent);
+  const isStockBrowser = /StockBrowser|NativeBrowser|TVBrowser/i.test(userAgent);
+  const isChrome = /Chrome/.test(userAgent);
+  const isFirefox = /Firefox/.test(userAgent);
+  const isSafari = /Safari/.test(userAgent) && !/Chrome/.test(userAgent);
+  
+  return {
+    userAgent,
+    isSmartTV,
+    isStockBrowser,
+    isChrome,
+    isFirefox,
+    isSafari,
+    supportsNotifications: 'Notification' in window,
+    supportsVibration: 'vibrate' in navigator,
+    supportsLocalStorage: 'localStorage' in window,
+    supportsSessionStorage: 'sessionStorage' in window
+  };
+};
+
+// Cross-browser localStorage with fallback
+const safeLocalStorage = {
+  getItem: (key: string) => {
+    try {
+      return window.localStorage ? localStorage.getItem(key) : null;
+    } catch (error) {
+      console.warn('localStorage not available:', error);
+      return null;
+    }
+  },
+  setItem: (key: string, value: string) => {
+    try {
+      if (window.localStorage) {
+        localStorage.setItem(key, value);
+      }
+    } catch (error) {
+      console.warn('localStorage not available:', error);
+    }
+  },
+  removeItem: (key: string) => {
+    try {
+      if (window.localStorage) {
+        localStorage.removeItem(key);
+      }
+    } catch (error) {
+      console.warn('localStorage not available:', error);
+    }
+  }
+};
+
+// Cross-browser fetch with timeout and retry
+const safeFetch = async (url: string, options: RequestInit = {}, retries: number = 3) => {
+  const browserInfo = getBrowserInfo();
+  
+  for (let i = 0; i < retries; i++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), browserInfo.isSmartTV ? 10000 : 5000);
+      
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': browserInfo.userAgent,
+          ...options.headers
+        }
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      return response;
+    } catch (error) {
+      console.warn(`Fetch attempt ${i + 1} failed:`, error);
+      if (i === retries - 1) {
+        throw error;
+      }
+      // Wait before retry
+      await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+    }
+  }
+  
+  throw new Error('All fetch attempts failed');
+};
+
+// Cross-browser navigation
+const safeNavigate = (navigate: any, path: string) => {
+  try {
+    navigate(path);
+  } catch (error) {
+    console.warn('Navigation error:', error);
+    // Fallback for smart TVs
+    window.location.href = path;
+  }
+};
+
 const PublicKiosk: React.FC = () => {
   const [selectedTransaction, setSelectedTransaction] = useState<string>('');
-  const [selectedPersonType, setSelectedPersonType] = useState<string>('Normal');
+  const [selectedPersonType, setSelectedPersonType] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedQueue, setGeneratedQueue] = useState<any>(null);
   const [kioskStatus, setKioskStatus] = useState<{ isOpen: boolean; title: string; message?: string; status?: string } | null>(null);
   const [transactionFlows, setTransactionFlows] = useState<any[]>([]);
+  const [personTypes, setPersonTypes] = useState<any[]>([]);
   const navigate = useNavigate();
 
   // Test navigation on component mount
@@ -25,13 +129,6 @@ const PublicKiosk: React.FC = () => {
     console.log('PublicKiosk component mounted, navigation available:', typeof navigate);
   }, []);
 
-  const personTypes = [
-    { name: 'Normal', icon: UserGroupIcon, color: 'blue', description: 'Regular customer' },
-    { name: 'Person with disabilities', icon: UserGroupIcon, color: 'green', description: 'Customer with disabilities' },
-    { name: 'Pregnant', icon: UserGroupIcon, color: 'pink', description: 'Pregnant customer' },
-    { name: 'Senior Citizen', icon: UserGroupIcon, color: 'purple', description: 'Senior citizen' },
-    { name: 'Priority', icon: UserGroupIcon, color: 'yellow', description: 'Priority customer' }
-  ];
 
   // Helper function to get API URL
   const getApiUrl = (endpoint: string) => {
@@ -48,26 +145,30 @@ const PublicKiosk: React.FC = () => {
         console.log('Transaction flows from API:', apiResponse);
         setTransactionFlows(Array.isArray(apiResponse.data) ? apiResponse.data : []);
       } else {
-        console.log('API response not ok, using fallback data');
-        // Fallback to mock data if API fails
-        const fallbackData = [
-          { _id: '1', name: 'Cash Deposit', prefix: 'CD', description: 'Deposit cash to account', isActive: true },
-          { _id: '2', name: 'Cash Withdrawal', prefix: 'CW', description: 'Withdraw cash from account', isActive: true },
-          { _id: '3', name: 'Account Inquiry', prefix: 'AI', description: 'Check account balance and details', isActive: true },
-          { _id: '4', name: 'Loan Application', prefix: 'LA', description: 'Apply for loan services', isActive: true }
-        ];
-        setTransactionFlows(fallbackData);
+        console.error('Failed to fetch transaction flows:', response.statusText);
+        setTransactionFlows([]);
       }
     } catch (error) {
       console.error('Error fetching transaction flows:', error);
-      // Fallback to mock data
-      const fallbackData = [
-        { _id: '1', name: 'Cash Deposit', prefix: 'CD', description: 'Deposit cash to account', isActive: true },
-        { _id: '2', name: 'Cash Withdrawal', prefix: 'CW', description: 'Withdraw cash from account', isActive: true },
-        { _id: '3', name: 'Account Inquiry', prefix: 'AI', description: 'Check account balance and details', isActive: true },
-        { _id: '4', name: 'Loan Application', prefix: 'LA', description: 'Apply for loan services', isActive: true }
-      ];
-      setTransactionFlows(fallbackData);
+      setTransactionFlows([]);
+    }
+  };
+
+  // Fetch person types from backend
+  const fetchPersonTypes = async () => {
+    try {
+      const response = await fetch(getApiUrl('/api/admin/person-types/public'));
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Person types from API:', data);
+        setPersonTypes(Array.isArray(data) ? data.filter((type: any) => type.isActive) : []);
+      } else {
+        console.error('Failed to fetch person types:', response.statusText);
+        setPersonTypes([]);
+      }
+    } catch (error) {
+      console.error('Error fetching person types:', error);
+      setPersonTypes([]);
     }
   };
 
@@ -94,6 +195,7 @@ const PublicKiosk: React.FC = () => {
 
   useEffect(() => {
     fetchTransactionFlows();
+    fetchPersonTypes();
     fetchKioskStatus();
     
     // Set up periodic status check every 30 seconds
@@ -130,31 +232,12 @@ const PublicKiosk: React.FC = () => {
         console.log('Queue data:', queueData);
         setGeneratedQueue(queueData);
       } else {
-        // Fallback to mock queue generation if API fails
-        const selectedFlow = transactionFlows.find(t => t.name === selectedTransaction);
-        const queueNumber = `${selectedFlow?.prefix}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
-        
-        const queueData = {
-          queueNumber,
-          service: selectedTransaction,
-          personType: selectedPersonType
-        };
-        
-        setGeneratedQueue(queueData);
+        console.error('Failed to generate queue:', response.statusText);
+        alert('Failed to generate queue. Please try again.');
       }
     } catch (error) {
       console.error('Error generating queue:', error);
-      // Fallback to mock queue generation
-      const selectedFlow = transactionFlows.find(t => t.name === selectedTransaction);
-      const queueNumber = `${selectedFlow?.prefix}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
-      
-      const queueData = {
-        queueNumber,
-        service: selectedTransaction,
-        personType: selectedPersonType
-      };
-      
-      setGeneratedQueue(queueData);
+      alert('Error generating queue. Please try again.');
     } finally {
       setIsGenerating(false);
     }
@@ -405,28 +488,39 @@ const PublicKiosk: React.FC = () => {
                 </div>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
-                  {personTypes.map((type) => {
-                    const IconComponent = type.icon;
-                    return (
-                      <button
-                        key={type.name}
-                        onClick={() => setSelectedPersonType(type.name)}
-                        className={`group relative p-3 sm:p-4 rounded-xl border-2 transition-all duration-300 transform hover:scale-105 ${
-                          selectedPersonType === type.name
-                            ? `border-${type.color}-500 bg-${type.color}-50 shadow-xl ring-2 ring-${type.color}-500 ring-opacity-50`
-                            : 'border-gray-200 hover:border-gray-300 hover:shadow-lg'
-                        }`}
-                      >
-                        <IconComponent className={`w-5 h-5 sm:w-6 sm:h-6 mx-auto mb-2 transition-colors duration-300 ${
-                          selectedPersonType === type.name ? `text-${type.color}-600` : 'text-gray-600'
-                        }`} />
-                        <div className={`text-xs sm:text-sm font-medium text-center transition-colors duration-300 ${
-                          selectedPersonType === type.name ? `text-${type.color}-700` : 'text-gray-900'
-                        }`}>{type.name}</div>
+                  {personTypes.map((type) => (
+                    <button
+                      key={type._id}
+                      onClick={() => setSelectedPersonType(type.name)}
+                      className={`group relative p-3 sm:p-4 rounded-xl border-2 transition-all duration-300 transform hover:scale-105 ${
+                        selectedPersonType === type.name
+                          ? 'border-blue-500 bg-blue-50 shadow-xl ring-2 ring-blue-500 ring-opacity-50'
+                          : 'border-gray-200 hover:border-gray-300 hover:shadow-lg'
+                      }`}
+                      style={{
+                        borderColor: selectedPersonType === type.name ? type.color : undefined,
+                        backgroundColor: selectedPersonType === type.name ? `${type.color}10` : undefined
+                      }}
+                    >
+                      <div 
+                        className="w-5 h-5 sm:w-6 sm:h-6 mx-auto mb-2 rounded-full border-2 border-gray-300"
+                        style={{ backgroundColor: type.color }}
+                      />
+                      <div className={`text-xs sm:text-sm font-medium text-center transition-colors duration-300 ${
+                        selectedPersonType === type.name ? 'text-blue-700' : 'text-gray-900'
+                      }`}>{type.name}</div>
+                      {type.description && (
                         <div className="text-xs text-gray-500 text-center mt-1 hidden sm:block">{type.description}</div>
-                      </button>
-                    );
-                  })}
+                      )}
+                      {type.priority && (
+                        <div className={`text-xs text-center mt-1 font-medium ${
+                          type.priority === 'High' ? 'text-red-600' : 'text-blue-600'
+                        }`}>
+                          {type.priority}
+                        </div>
+                      )}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>

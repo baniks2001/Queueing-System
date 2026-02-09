@@ -280,6 +280,17 @@ router.get('/person-types', authMiddleware, adminMiddleware, async (req, res) =>
   }
 });
 
+// Public endpoint for person types (no authentication required)
+router.get('/person-types/public', async (req, res) => {
+  try {
+    const personTypes = await PersonType.find({ isActive: true }).sort({ name: 1 });
+    res.json(personTypes);
+  } catch (error) {
+    console.error('Get public person types error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 router.post('/person-type', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const { name, description, priority, color } = req.body;

@@ -155,18 +155,23 @@ router.post('/generate', async (req, res) => {
       }
       queueNumberToAssign = `${prefix}${nextNumber.toString().padStart(3, '0')}`;
     } else {
-      // This queue needs to be inserted, shift other queues
-      const targetQueue = waitingQueues[insertPosition];
-      queueNumberToAssign = targetQueue.queueNumber;
+      // This queue needs to be inserted, use a different approach
+      // Instead of shifting existing queues, we'll assign a new number at the end
+      // and insert the record in the database with the correct logical position
       
-      // Shift all queues from this position forward
-      for (let i = waitingQueues.length - 1; i >= insertPosition; i--) {
-        const queue = waitingQueues[i];
-        const currentNumber = parseInt(queue.queueNumber.replace(prefix, ''));
-        const newNumber = currentNumber + 1;
-        queue.queueNumber = `${prefix}${newNumber.toString().padStart(3, '0')}`;
-        await queue.save();
+      // Get the highest queue number for this service
+      const lastQueue = await Queue.findOne({ service: transactionName })
+        .sort({ createdAt: -1 });
+      
+      let nextNumber = 1;
+      if (lastQueue) {
+        const lastNumber = parseInt(lastQueue.queueNumber.replace(prefix, ''));
+        nextNumber = lastNumber + 1;
       }
+      queueNumberToAssign = `${prefix}${nextNumber.toString().padStart(3, '0')}`;
+      
+      // Note: The fair positioning will be handled at the database query level
+      // when fetching waiting queues, not by manipulating queue numbers
     }
 
     // Create the queue with transaction flow information
@@ -212,10 +217,104 @@ function getNextWindowInFlow(windowFlow, currentWindow) {
   return nextFlowItem ? nextFlowItem.windowNumber : null;
 }
 
+// Helper function to sort queues with fair positioning (Low, Low, High, Low, High, Low, High...)
+async function sortQueuesWithFairPositioning(queues) {
+  // Filter out queues that are assigned to specific windows (in transit)
+  // Only include queues that are truly waiting for any window
+  const availableQueues = queues.filter(queue => !queue.currentWindow);
+  
+  console.log(`🎯 Available queues for fair positioning (excluding assigned): ${availableQueues.length}`);
+  console.log(`📋 Assigned queues (excluded): ${queues.length - availableQueues.length}`);
+  
+  // Separate queues by priority
+  const lowPriorityQueues = [];
+  const highPriorityQueues = [];
+  
+  for (const queue of availableQueues) {
+    const personType = await PersonType.findOne({ name: queue.personType, isActive: true });
+    if (personType && personType.priority === 'High') {
+      highPriorityQueues.push(queue);
+    } else {
+      lowPriorityQueues.push(queue);
+    }
+  }
+  
+  // Sort each group by creation time
+  lowPriorityQueues.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  highPriorityQueues.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  
+  // Interleave according to fair pattern: Low, Low, High, Low, High, Low, High...
+  const result = [];
+  let lowIndex = 0;
+  let highIndex = 0;
+  
+  // First two positions are always Low
+  for (let i = 0; i < 2 && lowIndex < lowPriorityQueues.length; i++) {
+    result.push(lowPriorityQueues[lowIndex++]);
+  }
+  
+  // Then alternate: High, Low, High, Low...
+  let isHighTurn = true;
+  while (lowIndex < lowPriorityQueues.length || highIndex < highPriorityQueues.length) {
+    if (isHighTurn && highIndex < highPriorityQueues.length) {
+      result.push(highPriorityQueues[highIndex++]);
+    } else if (!isHighTurn && lowIndex < lowPriorityQueues.length) {
+      result.push(lowPriorityQueues[lowIndex++]);
+    } else if (highIndex < highPriorityQueues.length) {
+      // If no more Low, add remaining High
+      result.push(highPriorityQueues[highIndex++]);
+    } else if (lowIndex < lowPriorityQueues.length) {
+      // If no more High, add remaining Low
+      result.push(lowPriorityQueues[lowIndex++]);
+    }
+    isHighTurn = !isHighTurn;
+  }
+  
+  return result;
+}
+
 router.get('/current', async (req, res) => {
   try {
-    const currentQueues = await Queue.find({ status: 'serving' })
+    // First try to find proper serving queues
+    let currentQueues = await Queue.find({ status: 'serving' })
       .sort({ createdAt: 1 });
+
+    // If no serving queues found, check for queues assigned to windows but stuck in waiting status
+    if (currentQueues.length === 0) {
+      console.log('⚠️ No serving queues found, checking for stuck queues...');
+      const stuckQueues = await Queue.find({ 
+        status: 'waiting',
+        currentWindow: { $exists: true, $ne: null }
+      }).sort({ createdAt: 1 });
+      
+      if (stuckQueues.length > 0) {
+        console.log(`🔧 Found ${stuckQueues.length} stuck queues, updating to serving status...`);
+        
+        // Update all stuck queues to serving status
+        const updatePromises = stuckQueues.map(queue => 
+          Queue.updateOne(
+            { _id: queue._id },
+            { status: 'serving', serviceStartTime: new Date() }
+          )
+        );
+        
+        await Promise.all(updatePromises);
+        
+        // Return the updated queues
+        currentQueues = stuckQueues.map(queue => ({
+          ...queue.toObject(),
+          status: 'serving',
+          serviceStartTime: new Date()
+        }));
+        
+        console.log(`✅ Updated ${currentQueues.length} queues to serving status`);
+      }
+    }
+
+    console.log(`📋 Total current queues: ${currentQueues.length}`);
+    currentQueues.forEach(queue => {
+      console.log(`🏢 Window ${queue.currentWindow}: ${queue.queueNumber}`);
+    });
 
     res.json(currentQueues);
   } catch (error) {
@@ -226,8 +325,16 @@ router.get('/current', async (req, res) => {
 
 router.get('/waiting', async (req, res) => {
   try {
+    // Get ALL waiting queues, including those assigned to windows
     const waitingQueues = await Queue.find({ status: 'waiting' })
       .sort({ createdAt: 1 });
+
+    console.log(`📋 Total waiting queues found: ${waitingQueues.length}`);
+    
+    // Log details of waiting queues
+    waitingQueues.forEach((queue, index) => {
+      console.log(`   ${index + 1}. ${queue.queueNumber} - Window: ${queue.currentWindow || 'None'} - Status: ${queue.status}`);
+    });
 
     res.json(waitingQueues);
   } catch (error) {
@@ -251,8 +358,12 @@ router.post('/next/:windowNumber', authMiddleware, async (req, res) => {
       await currentServing.save();
     }
 
-    const nextQueue = await Queue.findOne({ status: 'waiting' })
+    // Get waiting queues and apply fair positioning
+    const waitingQueues = await Queue.find({ status: 'waiting' })
       .sort({ createdAt: 1 });
+    
+    const sortedQueues = await sortQueuesWithFairPositioning(waitingQueues);
+    const nextQueue = sortedQueues[0] || null;
 
     if (nextQueue) {
       nextQueue.status = 'serving';
@@ -294,7 +405,7 @@ router.post('/next/:windowNumber', authMiddleware, async (req, res) => {
   }
 });
 
-router.get('/current/:windowNumber', authMiddleware, async (req, res) => {
+router.get('/current/:windowNumber', async (req, res) => {
   try {
     const { windowNumber } = req.params;
     const windowNum = parseInt(windowNumber);
@@ -303,10 +414,33 @@ router.get('/current/:windowNumber', authMiddleware, async (req, res) => {
       return res.status(400).json({ message: 'Invalid window number' });
     }
     
-    const currentQueue = await Queue.findOne({ 
+    // First try to find queues with proper serving status
+    let currentQueue = await Queue.findOne({ 
       currentWindow: windowNum,
       status: 'serving' 
     });
+    
+    // If no serving queues found, check for queues assigned to this window but stuck in waiting status
+    if (!currentQueue) {
+      console.log(`⚠️ No serving queue found for Window ${windowNum}, checking for stuck queues...`);
+      currentQueue = await Queue.findOne({ 
+        currentWindow: windowNum,
+        status: 'waiting'
+      });
+      
+      // If found a stuck queue, update it to serving status
+      if (currentQueue) {
+        console.log(`🔧 Found stuck queue ${currentQueue.queueNumber} at Window ${windowNum}, updating to serving status`);
+        await Queue.updateOne(
+          { _id: currentQueue._id },
+          { status: 'serving', serviceStartTime: new Date() }
+        );
+        currentQueue.status = 'serving';
+        currentQueue.serviceStartTime = new Date();
+      }
+    }
+    
+    console.log(`📋 Current queue for Window ${windowNum}:`, currentQueue?.queueNumber || 'None');
     res.json(currentQueue);
   } catch (error) {
     console.error('Get current queue error:', error);
@@ -314,7 +448,7 @@ router.get('/current/:windowNumber', authMiddleware, async (req, res) => {
   }
 });
 
-router.get('/next/:windowNumber', authMiddleware, async (req, res) => {
+router.get('/next/:windowNumber', async (req, res) => {
   try {
     const { windowNumber } = req.params;
     const windowNum = parseInt(windowNumber);
@@ -339,7 +473,7 @@ router.get('/next/:windowNumber', authMiddleware, async (req, res) => {
   }
 });
 
-router.post('/next-queue/:windowNumber', authMiddleware, async (req, res) => {
+router.post('/next-queue/:windowNumber', async (req, res) => {
   try {
     const { windowNumber } = req.params;
     const windowNum = parseInt(windowNumber);
@@ -354,17 +488,25 @@ router.post('/next-queue/:windowNumber', authMiddleware, async (req, res) => {
       status: 'serving' 
     });
 
+    console.log(`🔍 Current queue found for window ${windowNum}:`, currentQueue?.queueNumber);
+
     let completedQueue = null;
     
     if (currentQueue) {
-      // Handle transaction flow progression
-      if (currentQueue.windowFlow && currentQueue.windowFlow.length > 0) {
+      console.log(`🔄 Processing current queue: ${currentQueue.queueNumber}, transaction flow:`, currentQueue.windowFlow);
+      
+      // Handle transaction flow progression ONLY if there are multiple steps
+      if (currentQueue.windowFlow && currentQueue.windowFlow.length > 1) {
         // Find current step in the flow
         const currentStep = currentQueue.windowFlow.find(step => step.windowNumber === windowNum);
+        
+        console.log(`📍 Current step in flow:`, currentStep);
         
         if (currentStep) {
           // Find next step in the flow
           const nextStep = currentQueue.windowFlow.find(step => step.order === currentStep.order + 1);
+          
+          console.log(`➡️ Next step in flow:`, nextStep);
           
           if (nextStep) {
             // Move to next window in transaction flow
@@ -387,6 +529,8 @@ router.post('/next-queue/:windowNumber', authMiddleware, async (req, res) => {
               nextWindow: nextStep.windowNumber,
               currentStep: currentStep.order + 1
             };
+            
+            console.log(`🔄 Queue moved to next step: window ${nextStep.windowNumber}`);
           } else {
             // Transaction flow completed
             await Queue.updateOne(
@@ -404,6 +548,8 @@ router.post('/next-queue/:windowNumber', authMiddleware, async (req, res) => {
               currentWindow: null,
               nextWindow: null
             };
+            
+            console.log(`✅ Queue completed: ${currentQueue.queueNumber}`);
           }
         } else {
           // Current window not in flow, just complete
@@ -420,9 +566,11 @@ router.post('/next-queue/:windowNumber', authMiddleware, async (req, res) => {
             ...currentQueue.toObject(), 
             status: 'completed' 
           };
+          
+          console.log(`✅ Queue completed (window not in flow): ${currentQueue.queueNumber}`);
         }
       } else {
-        // No transaction flow, just complete
+        // No transaction flow or single-step flow, just complete the queue
         await Queue.updateOne(
           { _id: currentQueue._id },
           { 
@@ -436,15 +584,24 @@ router.post('/next-queue/:windowNumber', authMiddleware, async (req, res) => {
           ...currentQueue.toObject(), 
           status: 'completed' 
         };
+        
+        console.log(`✅ Queue completed (no multi-step flow): ${currentQueue.queueNumber}`);
       }
+    } else {
+      console.log(`⚠️ No current queue found for window ${windowNum}`);
     }
     
-    // Find next queue that should come to this window
-    const nextQueue = await Queue.findOne({ 
-      currentWindow: windowNum,
-      status: 'waiting' 
-    })
-    .sort({ createdAt: 1 });
+    // Find next queue using fair positioning on ALL waiting queues
+    const allWaitingQueues = await Queue.find({ status: 'waiting' })
+      .sort({ createdAt: 1 });
+    
+    console.log(`📋 All waiting queues count: ${allWaitingQueues.length}`);
+    
+    const sortedQueues = await sortQueuesWithFairPositioning(allWaitingQueues);
+    const nextQueue = sortedQueues[0] || null;
+    
+    console.log(`🎯 Next queue selected: ${nextQueue?.queueNumber || 'None'}`);
+    console.log(`📊 Fair positioning result (first 5):`, sortedQueues.slice(0, 5).map(q => ({ number: q.queueNumber, type: q.personType })));
     
     let updatedQueue = null;
     let nextQueues = [];
@@ -462,13 +619,11 @@ router.post('/next-queue/:windowNumber', authMiddleware, async (req, res) => {
       
       updatedQueue = { ...nextQueue.toObject(), status: 'serving', currentWindow: windowNum };
       
-      // Get remaining queues for this window
-      nextQueues = await Queue.find({ 
-        currentWindow: windowNum,
-        status: 'waiting' 
-      })
-      .sort({ createdAt: 1 })
-      .limit(10);
+      // Get remaining queues using fair positioning on ALL waiting queues
+      const allRemainingQueues = await Queue.find({ status: 'waiting' })
+        .sort({ createdAt: 1 });
+      
+      nextQueues = await sortQueuesWithFairPositioning(allRemainingQueues);
     }
     
     // Emit real-time updates
@@ -510,15 +665,18 @@ router.get('/waiting/:windowNumber', authMiddleware, async (req, res) => {
       return res.status(400).json({ message: 'Invalid window number' });
     }
     
-    const waitingQueues = await Queue.find({ 
-      currentWindow: windowNum,
-      status: 'waiting' 
+    // Find queues that should come to this window (either nextWindow or currentWindow)
+    const nextQueues = await Queue.find({ 
+      $or: [
+        { nextWindow: windowNum, status: 'waiting' },
+        { currentWindow: windowNum, status: 'waiting' }
+      ]
     })
     .sort({ createdAt: 1 })
     .limit(10);
-    res.json(waitingQueues);
+    res.json(nextQueues);
   } catch (error) {
-    console.error('Get waiting queues error:', error);
+    console.error('Get next queues error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

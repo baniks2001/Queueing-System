@@ -112,14 +112,23 @@ export const QueueProvider: React.FC<QueueProviderProps> = ({ children }) => {
 
   const refreshQueues = async () => {
     try {
+      console.log('🔄 Refreshing queues...');
+      
       const [currentResponse, waitingResponse] = await Promise.all([
         axios.get(getApiUrl('/api/queue/current')),
         axios.get(getApiUrl('/api/queue/waiting'))
       ]);
 
+      console.log('✅ Current queues response:', currentResponse.data);
+      console.log('✅ Waiting queues response:', waitingResponse.data);
+      console.log('📊 Current queues length:', currentResponse.data.length);
+      console.log('📊 Waiting queues length:', waitingResponse.data.length);
+
       setCurrentQueues(currentResponse.data);
       setWaitingQueues(waitingResponse.data);
       setQueues([...currentResponse.data, ...waitingResponse.data]);
+      
+      console.log('🔄 Queues refreshed successfully');
     } catch (error) {
       console.error('Error refreshing queues:', error);
       // Don't throw error to prevent app crashes

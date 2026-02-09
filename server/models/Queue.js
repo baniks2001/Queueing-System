@@ -8,7 +8,7 @@ const queueSchema = new mongoose.Schema({
   },
   personType: {
     type: String,
-    enum: ['Normal', 'Person with disabilities', 'Pregnant', 'Senior Citizen', 'Priority'],
+    required: true,
     default: 'Normal'
   },
   service: {

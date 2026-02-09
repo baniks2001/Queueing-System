@@ -2,6 +2,40 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
+// Cross-browser compatibility utilities
+const getBrowserInfo = () => {
+  const userAgent = navigator.userAgent;
+  const isSmartTV = /SmartTV|WebOS|Tizen|Android.*TV/i.test(userAgent);
+  const isStockBrowser = /StockBrowser|NativeBrowser|TVBrowser/i.test(userAgent);
+  const isChrome = /Chrome/.test(userAgent);
+  const isFirefox = /Firefox/.test(userAgent);
+  const isSafari = /Safari/.test(userAgent) && !/Chrome/.test(userAgent);
+  
+  return {
+    userAgent,
+    isSmartTV,
+    isStockBrowser,
+    isChrome,
+    isFirefox,
+    isSafari,
+    supportsNotifications: 'Notification' in window,
+    supportsVibration: 'vibrate' in navigator,
+    supportsLocalStorage: 'localStorage' in window,
+    supportsSessionStorage: 'sessionStorage' in window
+  };
+};
+
+// Cross-browser navigation
+const safeNavigate = (navigate: any, path: string) => {
+  try {
+    navigate(path);
+  } catch (error) {
+    console.warn('Navigation error:', error);
+    // Fallback for smart TVs
+    window.location.href = path;
+  }
+};
+
 const WindowLogin: React.FC = () => {
   const [formData, setFormData] = useState({
     username: '',
