@@ -7,7 +7,7 @@ interface PersonType {
   _id: string;
   name: string;
   description: string;
-  priority: number;
+  priority: 'Low' | 'High';
   color: string;
   isActive: boolean;
 }
@@ -19,7 +19,7 @@ const QueueManagement: React.FC = () => {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    priority: 0,
+    priority: 'Low' as 'Low' | 'High',
     color: '#3B82F6'
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -88,7 +88,7 @@ const QueueManagement: React.FC = () => {
         setFormData({
           name: '',
           description: '',
-          priority: 0,
+          priority: 'Low' as 'Low' | 'High',
           color: '#3B82F6'
         });
       }
@@ -135,7 +135,7 @@ const QueueManagement: React.FC = () => {
     setFormData({
       name: '',
       description: '',
-      priority: 0,
+      priority: 'Low' as 'Low' | 'High',
       color: '#3B82F6'
     });
     setIsModalOpen(true);
@@ -178,7 +178,11 @@ const QueueManagement: React.FC = () => {
                   <td className="py-3 px-4 font-medium">{type.name}</td>
                   <td className="py-3 px-4 text-sm text-gray-600">{type.description}</td>
                   <td className="py-3 px-4">
-                    <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      type.priority === 'High' 
+                        ? 'bg-red-100 text-red-800' 
+                        : 'bg-blue-100 text-blue-800'
+                    }`}>
                       {type.priority}
                     </span>
                   </td>
@@ -255,15 +259,15 @@ const QueueManagement: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
-                  <input
-                    type="number"
+                  <select
                     value={formData.priority}
-                    onChange={(e) => setFormData({...formData, priority: parseInt(e.target.value)})}
+                    onChange={(e) => setFormData({...formData, priority: e.target.value as 'Low' | 'High'})}
                     className="input-field"
-                    min="0"
-                    max="10"
                     required
-                  />
+                  >
+                    <option value="Low">Low</option>
+                    <option value="High">High</option>
+                  </select>
                 </div>
 
                 <div>

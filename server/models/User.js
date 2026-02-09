@@ -22,16 +22,16 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['admin', 'window', 'super_admin'],
+    enum: ['admin', 'window', 'table', 'super_admin'],
     default: 'window'
   },
   windowNumber: {
     type: Number,
-    required: function() { return this.role === 'window'; }
+    required: function() { return this.role === 'window' || this.role === 'table'; }
   },
   service: {
     type: String,
-    required: function() { return this.role === 'window'; }
+    required: function() { return this.role === 'window' || this.role === 'table'; }
   },
   isActive: {
     type: Boolean,

@@ -252,7 +252,10 @@ const UserManagement: React.FC = () => {
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">Username</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">Email</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">Role</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Window/Service</th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                  {users.some(u => u.role === 'table') ? 'Window/Table Number' : 'Window Number'}
+                </th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-700">Service</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">Actions</th>
               </tr>
@@ -271,13 +274,24 @@ const UserManagement: React.FC = () => {
                   </td>
                   <td className="py-3 px-4">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      user.role === 'window' ? 'bg-blue-100 text-blue-800' :
-                      'bg-red-100 text-red-800'
+                      user.role === 'window' ? 'bg-green-100 text-green-800' :
+                      'bg-orange-100 text-orange-800'
                     }`}>
-                      {user.role === 'window' ? 'Window' : 'Table'}
+                      {user.role === 'window' ? `Window ${user.windowNumber || '-'}` : `Table ${user.windowNumber || '-'}`}
                     </span>
                   </td>
-                  <td className="py-3 px-4">{user.isActive ? 'Active' : 'Inactive'}</td>
+                  <td className="py-3 px-4">
+                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                      {user.service || 'General Service'}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      user.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}>
+                      {user.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
                   <td className="py-3 px-4">
                     <div className="flex space-x-2">
                       <button
@@ -373,10 +387,12 @@ const UserManagement: React.FC = () => {
                 </div>
               )}
 
-              {formData.role === 'window' && (
+              {(formData.role === 'window' || formData.role === 'table') && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Window Number</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {formData.role === 'window' ? 'Window Number' : 'Table Number'}
+                    </label>
                     <input
                       type="number"
                       value={formData.windowNumber}

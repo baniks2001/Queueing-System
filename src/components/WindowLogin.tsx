@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { CONFIG } from '../config/app-config';
 
 const WindowLogin: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -20,36 +19,14 @@ const WindowLogin: React.FC = () => {
     setError('');
 
     try {
-      // Clear any existing auth data first
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      // Use the auth context login function instead of manual fetch
+      await login(formData.username, formData.password);
       
-      const response = await fetch(CONFIG.LOGIN_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        // Store token and user data
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        
-        // Update auth context with login function
-        await login(formData.username, formData.password);
-        
-        // Redirect to window dashboard
-        navigate('/window/dashboard');
-      } else {
-        setError(data.message || 'Login failed');
-      }
-    } catch (error) {
+      // Redirect to window dashboard
+      navigate('/window/dashboard');
+    } catch (error: any) {
       console.error('Login error:', error);
-      setError('Network error. Please try again.');
+      setError(error.response?.data?.message || error.message || 'Login failed');
     } finally {
       setIsLoading(false);
     }

@@ -11,10 +11,9 @@ const personTypeSchema = new mongoose.Schema({
     trim: true
   },
   priority: {
-    type: Number,
-    default: 0,
-    min: 0,
-    max: 10
+    type: String,
+    enum: ['Low', 'High'],
+    default: 'Low'
   },
   color: {
     type: String,

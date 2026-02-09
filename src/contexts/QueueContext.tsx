@@ -55,9 +55,21 @@ export const QueueProvider: React.FC<QueueProviderProps> = ({ children }) => {
     const newSocket = io(getSocketUrl(), {
       transports: ['websocket', 'polling'],
       timeout: 20000,
-      forceNew: true
+      forceNew: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000
     });
     setSocket(newSocket);
+
+    newSocket.on('connect', () => {
+      console.log('🔌 Socket connected');
+      refreshQueues();
+    });
+
+    newSocket.on('disconnect', () => {
+      console.log('🔌 Socket disconnected');
+    });
 
     newSocket.on('queueGenerated', (data) => {
       console.log('New queue generated:', data);
@@ -77,13 +89,10 @@ export const QueueProvider: React.FC<QueueProviderProps> = ({ children }) => {
     newSocket.on('repeat-announcement', (data) => {
       console.log('Repeat announcement triggered:', data);
       // Trigger repeat announcement in PublicDisplay
-      if (data.queues && data.queues.length > 0) {
-        data.queues.forEach((queue: any) => {
-          if (queue.queueNumber && queue.currentWindow) {
-            playSound(queue.queueNumber, queue.currentWindow);
-          }
-        });
-      }
+    });
+
+    newSocket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
     });
 
     return () => {
@@ -113,11 +122,20 @@ export const QueueProvider: React.FC<QueueProviderProps> = ({ children }) => {
       setQueues([...currentResponse.data, ...waitingResponse.data]);
     } catch (error) {
       console.error('Error refreshing queues:', error);
+      // Don't throw error to prevent app crashes
     }
   };
 
   useEffect(() => {
+    // Initial load
     refreshQueues();
+    
+    // Set up periodic refresh with reasonable interval
+    const interval = setInterval(() => {
+      refreshQueues();
+    }, 10000); // 10 seconds
+    
+    return () => clearInterval(interval);
   }, []);
 
   const generateQueue = async (transactionName: string, personType: string): Promise<Queue> => {

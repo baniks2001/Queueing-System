@@ -6,7 +6,6 @@ import {
   ArrowRightOnRectangleIcon,
   PlayIcon,
   UserGroupIcon,
-  ClockIcon,
   SpeakerWaveIcon
 } from '@heroicons/react/24/outline';
 
@@ -31,9 +30,6 @@ export default function WindowDashboard() {
   const [currentQueue, setCurrentQueue] = useState<Queue | null>(null);
   const [nextQueues, setNextQueues] = useState<Queue[]>([]);
   const [isCalling, setIsCalling] = useState(false);
-  const [buttonDisabled, setButtonDisabled] = useState(false);
-  const [lastQueueReceived, setLastQueueReceived] = useState<Date | null>(null);
-  const [autoCallEnabled, setAutoCallEnabled] = useState(true);
 
   useEffect(() => {
     console.log('Window Dashboard - User object:', user);
@@ -43,33 +39,36 @@ export default function WindowDashboard() {
     if (user && user.windowNumber) {
       fetchCurrentQueue();
       fetchNextQueues();
-    }
-  }, [user]); // Add user as dependency
-
-  // Timer effect for button disable
-  useEffect(() => {
-    if (lastQueueReceived) {
-      const timer = setTimeout(() => {
-        setButtonDisabled(false);
-      }, 5000); // 5 seconds
-
-      return () => clearTimeout(timer);
-    }
-  }, [lastQueueReceived]);
-
-  // Auto-call effect: automatically call next queue when no current queue but waiting queues exist
-  useEffect(() => {
-    if (autoCallEnabled && !currentQueue && nextQueues.length > 0 && !isCalling && !buttonDisabled) {
-      console.log('🤖 Auto-calling next queue - No current queue, but waiting queues available');
       
-      // Small delay to ensure UI is ready
-      const timer = setTimeout(() => {
-        handleNextQueue();
-      }, 1000); // 1 second delay
-
-      return () => clearTimeout(timer);
+      // Set up periodic refresh for data only
+      const interval = setInterval(() => {
+        // Only refresh if not currently calling a queue to avoid conflicts
+        if (!isCalling) {
+          fetchCurrentQueue();
+          fetchNextQueues();
+        }
+      }, 3000); // Refresh every 3 seconds for better responsiveness
+      
+      return () => clearInterval(interval);
     }
-  }, [currentQueue, nextQueues, autoCallEnabled, isCalling, buttonDisabled]);
+  }, [user, isCalling]); // Add isCalling as dependency
+
+  // Auto-call effect: DISABLED - only manual next queue calls allowed
+  // useEffect(() => {
+  //   if (autoCallEnabled && !currentQueue && nextQueues.length > 0 && !isCalling) {
+  //     console.log('🤖 Auto-calling next queue - No current queue, but waiting queues available');
+  //     
+  //     // Small delay to ensure UI is ready and avoid conflicts with refresh
+  //     const timer = setTimeout(() => {
+  //       // Double-check conditions before auto-calling
+  //       if (autoCallEnabled && !currentQueue && nextQueues.length > 0 && !isCalling) {
+  //         handleNextQueue();
+  //       }
+  //     }, 2000); // 2 second delay to avoid conflicts
+
+  //     return () => clearTimeout(timer);
+  //   }
+  // }, [currentQueue, nextQueues, autoCallEnabled, isCalling]);
 
   const fetchCurrentQueue = async () => {
     try {
@@ -96,14 +95,17 @@ export default function WindowDashboard() {
         
         // Check if this is a new queue (different from previous)
         if (data && (!currentQueue || data._id !== currentQueue._id)) {
-          setLastQueueReceived(new Date());
-          setButtonDisabled(true);
+          console.log('New queue received:', data.queueNumber);
         }
         
         setCurrentQueue(data);
+      } else {
+        console.error('Current queue failed with status:', response.status);
+        setCurrentQueue(null);
       }
     } catch (error) {
       console.error('Error fetching current queue:', error);
+      setCurrentQueue(null);
     }
   };
 
@@ -135,14 +137,16 @@ export default function WindowDashboard() {
       } else {
         console.error('Waiting queues failed with status:', response.status);
         console.error('Waiting queues failed response:', await response.text());
+        setNextQueues([]);
       }
     } catch (error) {
       console.error('Error fetching next queues:', error);
+      setNextQueues([]);
     }
   };
 
   const handleNextQueue = async () => {
-    if (isCalling || buttonDisabled) return;
+    if (isCalling) return;
     
     setIsCalling(true);
     try {
@@ -171,12 +175,6 @@ export default function WindowDashboard() {
         console.log('Next queue response:', data);
         console.log('Current queue from response:', data.currentQueue);
         console.log('Next queues from response:', data.nextQueues);
-        
-        // If we received a new current queue, set it timer
-        if (data.currentQueue && (!currentQueue || data.currentQueue._id !== currentQueue._id)) {
-          setLastQueueReceived(new Date());
-          setButtonDisabled(true);
-        }
         
         setCurrentQueue(data.currentQueue);
         setNextQueues(data.nextQueues);
@@ -233,40 +231,41 @@ export default function WindowDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header - Fully Responsive */}
-      <div className="bg-white shadow-sm border-b border-gray-200">
+      {/* Header - Fixed Position Mobile */}
+      <div className="bg-blue-600 shadow-md border-b border-blue-700 fixed top-0 left-0 right-0 z-50">
         <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center h-16 sm:h-auto py-2 sm:py-0">
-            <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
-              <h1 className="text-lg sm:text-xl font-semibold text-gray-900 text-center sm:text-left">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center space-x-3">
+              <h1 className="text-lg sm:text-xl font-semibold text-white">
                 Window {user?.windowNumber || 'N/A'}
               </h1>
-              <div className="flex flex-wrap justify-center sm:justify-start gap-2">
-                <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs sm:text-sm font-medium">
+              <div className="hidden sm:flex space-x-2">
+                <span className="px-2 py-1 bg-blue-500 text-white rounded-full text-xs sm:text-sm font-medium">
                   {user?.username || 'Unknown User'}
                 </span>
-                <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs sm:text-sm font-medium">
+                <span className="px-2 py-1 bg-green-500 text-white rounded-full text-xs sm:text-sm font-medium">
                   Transaction Window
                 </span>
               </div>
             </div>
-            <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
-              <span className="text-xs sm:text-sm text-gray-600">
+            <div className="flex items-center space-x-3">
+              <span className="hidden sm:block text-sm text-white">
                 {user?.username}
               </span>
               <button
                 onClick={handleLogout}
-                className="inline-flex items-center px-2 py-1 sm:px-3 sm:py-2 border border-transparent text-xs sm:text-sm leading-4 font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
               >
-                <ArrowRightOnRectangleIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                <ArrowRightOnRectangleIcon className="h-4 w-4 mr-2" />
                 <span className="hidden sm:inline">Logout</span>
+                <span className="sm:hidden">Exit</span>
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 pt-20 sm:pt-24 lg:pt-28 pb-4 sm:pb-6 lg:pb-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
           
           {/* Currently Serving - Responsive */}
@@ -321,25 +320,16 @@ export default function WindowDashboard() {
                   </div>
                 ) : (
                   <div className="text-3xl sm:text-4xl text-gray-400 py-8 sm:py-12">
-                    {autoCallEnabled && nextQueues.length > 0 ? (
-                      <div className="text-center">
-                        <div className="animate-pulse mb-4 sm:mb-6">
-                          <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 bg-blue-100 rounded-full">
-                            <PlayIcon className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600 animate-bounce" />
-                          </div>
-                        </div>
-                        <p className="text-sm sm:text-base text-blue-600 font-medium">Auto-calling next queue...</p>
-                        <p className="text-xs sm:text-sm text-gray-500 mt-2">Next queue will be called automatically</p>
-                      </div>
-                    ) : (
-                      <div className="text-center">
-                        <UserGroupIcon className="h-8 w-8 sm:h-12 sm:w-12 mx-auto text-gray-300 mb-3 sm:mb-4" />
-                        <p className="text-sm sm:text-base">No queue currently being served</p>
-                        {nextQueues.length === 0 && (
-                          <p className="text-xs sm:text-sm text-gray-500 mt-2">No queues waiting</p>
-                        )}
-                      </div>
-                    )}
+                    <div className="text-center">
+                      <UserGroupIcon className="h-8 w-8 sm:h-12 sm:w-12 mx-auto text-gray-300 mb-3 sm:mb-4" />
+                      <p className="text-sm sm:text-base">No queue currently being served</p>
+                      {nextQueues.length === 0 && (
+                        <p className="text-xs sm:text-sm text-gray-500 mt-2">No queues waiting</p>
+                      )}
+                      {nextQueues.length > 0 && (
+                        <p className="text-xs sm:text-sm text-blue-600 mt-2">Press "Next Queue" to call next customer</p>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -349,18 +339,13 @@ export default function WindowDashboard() {
             <div className="mt-4 sm:mt-6 lg:mt-8">
               <button
                 onClick={handleNextQueue}
-                disabled={isCalling || buttonDisabled}
+                disabled={isCalling}
                 className="w-full bg-blue-600 text-white py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8 rounded-lg text-lg sm:text-xl lg:text-2xl font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center"
               >
                 {isCalling ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 border-b-2 border-white mr-2 sm:mr-3"></div>
                     <span className="text-sm sm:text-base">Processing...</span>
-                  </>
-                ) : buttonDisabled ? (
-                  <>
-                    <div className="animate-pulse h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 border-2 border-white rounded-full mr-2 sm:mr-3"></div>
-                    <span className="text-sm sm:text-base">Please wait...</span>
                   </>
                 ) : (
                   <>
@@ -380,18 +365,6 @@ export default function WindowDashboard() {
                   <UserGroupIcon className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                   Next in Queue
                 </h3>
-                <div className="flex items-center mt-2 sm:mt-0">
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={autoCallEnabled}
-                      onChange={(e) => setAutoCallEnabled(e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-8 h-4 sm:w-11 sm:h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 sm:after:h-5 sm:after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                    <span className="ml-2 sm:ml-3 text-xs sm:text-sm font-medium text-gray-700">Auto-call</span>
-                  </label>
-                </div>
               </div>
               
               {nextQueues.length > 0 ? (

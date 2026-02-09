@@ -63,7 +63,9 @@ router.get('/all-users', authMiddleware, adminMiddleware, async (req, res) => {
 // Create admin user
 router.post('/admin-user', authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    const { username, email, password, role } = req.body;
+    const { username, email, password, role, windowNumber, service } = req.body;
+
+    console.log('Creating admin/table user:', { username, email, role, windowNumber, service });
 
     const existingUser = await User.findOne({
       $or: [{ username }, { email }]
@@ -73,27 +75,39 @@ router.post('/admin-user', authMiddleware, adminMiddleware, async (req, res) => 
       return res.status(400).json({ message: 'Username or email already exists' });
     }
 
+    // Validate required fields based on role
+    if ((role === 'window' || role === 'table') && (!windowNumber || !service)) {
+      return res.status(400).json({ message: 'Window/Table number and service are required for window/table users' });
+    }
+
     const newUser = new User({
       username,
       email,
       password, // Will be hashed by pre-save middleware
-      role: role || 'admin'
+      role: role || 'admin',
+      windowNumber: role === 'window' || role === 'table' ? windowNumber : undefined,
+      service: role === 'window' || role === 'table' ? service : undefined
     });
 
     await newUser.save();
 
     res.status(201).json({
-      message: 'Admin user created successfully',
+      message: 'User created successfully',
       user: {
         id: newUser._id,
         username: newUser.username,
         email: newUser.email,
         role: newUser.role,
+        windowNumber: newUser.windowNumber,
+        service: newUser.service,
         isActive: newUser.isActive
       }
     });
   } catch (error) {
     console.error('Create admin user error:', error);
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ message: error.message });
+    }
     res.status(500).json({ message: 'Server error' });
   }
 });

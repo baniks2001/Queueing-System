@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const Queue = require('../models/Queue');
 const Service = require('../models/Service');
 const TransactionFlow = require('../models/TransactionFlow');
+const PersonType = require('../models/PersonType');
 const router = express.Router();
 
 const authMiddleware = async (req, res, next) => {
@@ -59,21 +60,118 @@ router.post('/generate', async (req, res) => {
       firstWindow = windowFlow.find(w => w.order === 1)?.windowNumber;
     }
 
-    // Get the last queue number for this transaction/service
-    const lastQueue = await Queue.findOne({ service: transactionName })
-      .sort({ createdAt: -1 });
-
-    let nextNumber = 1;
-    if (lastQueue) {
-      const lastNumber = parseInt(lastQueue.queueNumber.replace(prefix, ''));
-      nextNumber = lastNumber + 1;
+    // Get the person type to determine priority
+    const personTypeDoc = await PersonType.findOne({ name: personType, isActive: true });
+    if (!personTypeDoc) {
+      return res.status(400).json({ message: 'Person type not found' });
     }
 
-    const queueNumber = `${prefix}${nextNumber.toString().padStart(3, '0')}`;
+    // Get all waiting queues for this service to determine fair positioning
+    const waitingQueues = await Queue.find({ 
+      service: transactionName, 
+      status: 'waiting' 
+    }).sort({ createdAt: 1 });
+
+    // Calculate position based on fair pattern: Low, Low, High, Low, High, Low, High...
+    let insertPosition = 0;
+    const priority = personTypeDoc.priority;
+    
+    if (priority === 'High') {
+      // For High priority: find the 3rd position, then every 2nd position after that
+      // Pattern: Low, Low, High, Low, High, Low, High...
+      // High positions: 2, 4, 6, 8... (0-indexed: 2, 3, 5, 7...)
+      let highPositionCount = 0;
+      for (let i = 0; i < waitingQueues.length; i++) {
+        const queuePersonType = await PersonType.findOne({ name: waitingQueues[i].personType, isActive: true });
+        if (queuePersonType && queuePersonType.priority === 'High') {
+          highPositionCount++;
+        }
+      }
+      
+      // Calculate where this High priority should be placed
+      if (highPositionCount === 0) {
+        insertPosition = 2; // First High goes at position 2 (3rd position)
+      } else {
+        // Subsequent High priorities go at positions: 3, 5, 7, 9...
+        insertPosition = 2 + highPositionCount;
+      }
+    } else {
+      // For Low priority: fill in the gaps or append to end
+      // Low positions: 0, 1, 4, 6, 8, 10... (every position that's not High)
+      let lowPositionCount = 0;
+      for (let i = 0; i < waitingQueues.length; i++) {
+        const queuePersonType = await PersonType.findOne({ name: waitingQueues[i].personType, isActive: true });
+        if (queuePersonType && queuePersonType.priority === 'Low') {
+          lowPositionCount++;
+        }
+      }
+      
+      // Find the next available Low position
+      let expectedLowPositions = [0, 1]; // First two positions are always Low
+      let nextLowPos = 4; // Next Low positions start at 4, then 6, 8, 10...
+      
+      while (expectedLowPositions.length <= lowPositionCount) {
+        expectedLowPositions.push(nextLowPos);
+        nextLowPos += 2;
+      }
+      
+      // Find the first available Low position
+      for (const pos of expectedLowPositions) {
+        if (pos >= waitingQueues.length) {
+          insertPosition = pos;
+          break;
+        }
+        
+        // Check if this position is occupied by a Low priority
+        const queueAtPos = waitingQueues[pos];
+        if (queueAtPos) {
+          const queuePersonType = await PersonType.findOne({ name: queueAtPos.personType, isActive: true });
+          if (queuePersonType && queuePersonType.priority === 'Low') {
+            continue; // This position is occupied by Low, look for next
+          }
+        }
+        
+        insertPosition = pos;
+        break;
+      }
+      
+      // If no specific position found, append to end
+      if (insertPosition === 0 && waitingQueues.length > 0) {
+        insertPosition = waitingQueues.length;
+      }
+    }
+
+    // Get the queue number that should be assigned based on position
+    let queueNumberToAssign;
+    if (insertPosition >= waitingQueues.length) {
+      // This queue goes at the end, get next number
+      const lastQueue = await Queue.findOne({ service: transactionName })
+        .sort({ createdAt: -1 });
+      
+      let nextNumber = 1;
+      if (lastQueue) {
+        const lastNumber = parseInt(lastQueue.queueNumber.replace(prefix, ''));
+        nextNumber = lastNumber + 1;
+      }
+      queueNumberToAssign = `${prefix}${nextNumber.toString().padStart(3, '0')}`;
+    } else {
+      // This queue needs to be inserted, shift other queues
+      const targetQueue = waitingQueues[insertPosition];
+      queueNumberToAssign = targetQueue.queueNumber;
+      
+      // Shift all queues from this position forward
+      for (let i = waitingQueues.length - 1; i >= insertPosition; i--) {
+        const queue = waitingQueues[i];
+        const currentNumber = parseInt(queue.queueNumber.replace(prefix, ''));
+        const newNumber = currentNumber + 1;
+        queue.queueNumber = `${prefix}${newNumber.toString().padStart(3, '0')}`;
+        await queue.save();
+      }
+    }
 
     // Create the queue with transaction flow information
     const queue = new Queue({
-      queueNumber,
+      queueNumber: queueNumberToAssign,
       service: transactionName,
       personType,
       status: 'waiting',

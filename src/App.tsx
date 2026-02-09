@@ -6,7 +6,6 @@ import WindowLogin from './components/WindowLogin';
 import AdminDashboard from './components/AdminDashboard';
 import WindowDashboard from './components/WindowDashboard';
 import PublicDisplay from './components/PublicDisplay';
-import TestComponent from './components/TestComponent';
 import { AuthProvider } from './contexts/AuthContext';
 import { QueueProvider } from './contexts/QueueContext';
 import { CONFIG } from './config/app-config';
@@ -44,7 +43,6 @@ function App() {
           <div className="min-h-screen bg-gray-50">
             <ConnectionTest />
             <Routes>
-              <Route path="/test" element={<TestComponent />} />
               <Route path="/" element={<PublicKiosk />} />
               <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/window/login" element={<WindowLogin />} />

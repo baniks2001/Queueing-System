@@ -1,18 +1,56 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
 const User = require('../models/User');
 const Admin = require('../models/Admin');
 const { findUserByUsername, findAdminByUsername } = require('../temp-users');
 const router = express.Router();
 
+// Enhanced rate limiting for authentication routes
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 login attempts per window
+  message: {
+    error: 'Too many login attempts, please try again later.',
+    retryAfter: 900
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true // Don't count successful requests
+});
+
+// Apply rate limiting to authentication routes
+router.use(authLimiter);
+
 const generateToken = (userId, role) => {
-  return jwt.sign({ userId, role }, process.env.JWT_SECRET, { expiresIn: '24h' });
+  // Enhanced JWT with security claims
+  return jwt.sign(
+    { 
+      userId, 
+      role,
+      iat: Math.floor(Date.now() / 1000), // Issued at
+      exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60), // Expires in 24 hours
+      iss: 'queueing-system', // Issuer
+      aud: 'queueing-users' // Audience
+    }, 
+    process.env.JWT_SECRET, 
+    { algorithm: 'HS256' }
+  );
 };
 
 router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
-    console.log('Login attempt for username:', username);
+    
+    // Input validation and sanitization
+    if (!username || !password) {
+      return res.status(400).json({ message: 'Username and password are required' });
+    }
+    
+    // Sanitize input
+    const sanitizedUsername = username.trim().slice(0, 50);
+    
+    console.log('Login attempt for username:', sanitizedUsername);
 
     let user;
     
@@ -68,14 +106,18 @@ router.post('/login', async (req, res) => {
     
     console.log('User response object:', userResponse);
     
+    // Enhanced security response
     res.json({
       token,
-      user: userResponse
+      user: userResponse,
+      expiresIn: '24h',
+      tokenType: 'Bearer'
     });
   } catch (error) {
     console.error('Login error:', error);
     console.error('Error stack:', error.stack);
-    res.status(500).json({ message: 'Server error during login' });
+    // Generic error message for security
+    res.status(500).json({ message: 'Authentication failed' });
   }
 });
 
@@ -83,15 +125,20 @@ router.post('/super-admin-login', async (req, res) => {
   try {
     const { username, password } = req.body;
     
-    // Debug: Log environment variables and incoming request
+    // Input validation
+    if (!username || !password) {
+      return res.status(400).json({ message: 'Username and password are required' });
+    }
+    
+    // Sanitize input
+    const sanitizedUsername = username.trim().slice(0, 50);
+    
+    // Debug: Log environment variables and incoming request (without sensitive data)
     console.log('Backend - SUPER_ADMIN_USERNAME:', process.env.SUPER_ADMIN_USERNAME);
-    console.log('Backend - SUPER_ADMIN_PASSWORD:', process.env.SUPER_ADMIN_PASSWORD);
-    console.log('Backend - Request username:', username);
-    console.log('Backend - Request password:', password);
-    console.log('Backend - Username match:', username === process.env.SUPER_ADMIN_USERNAME);
-    console.log('Backend - Password match:', password === process.env.SUPER_ADMIN_PASSWORD);
+    console.log('Backend - Request username:', sanitizedUsername);
+    console.log('Backend - Username match:', sanitizedUsername === process.env.SUPER_ADMIN_USERNAME);
 
-    if (username === process.env.SUPER_ADMIN_USERNAME && password === process.env.SUPER_ADMIN_PASSWORD) {
+    if (sanitizedUsername === process.env.SUPER_ADMIN_USERNAME && password === process.env.SUPER_ADMIN_PASSWORD) {
       const token = generateToken('super-admin', 'super_admin');
       res.json({
         token,
@@ -100,14 +147,17 @@ router.post('/super-admin-login', async (req, res) => {
           username: process.env.SUPER_ADMIN_USERNAME,
           email: process.env.SUPER_ADMIN_EMAIL,
           role: 'super_admin'
-        }
+        },
+        expiresIn: '24h',
+        tokenType: 'Bearer'
       });
     } else {
-      res.status(401).json({ message: 'Invalid super admin credentials' });
+      // Generic error message for security
+      res.status(401).json({ message: 'Invalid credentials' });
     }
   } catch (error) {
     console.error('Super admin login error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Authentication failed' });
   }
 });
 
