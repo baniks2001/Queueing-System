@@ -3,7 +3,6 @@ const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
 const User = require('../models/User');
 const Admin = require('../models/Admin');
-const { findUserByUsername, findAdminByUsername } = require('../temp-users');
 const router = express.Router();
 
 // Enhanced rate limiting for authentication routes
@@ -66,13 +65,8 @@ router.post('/login', async (req, res) => {
       }
       
     } catch (dbError) {
-      console.log('MongoDB error, using fallback:', dbError.message);
-      // Fallback to temporary users - check admin first, then user
-      user = await findAdminByUsername(username);
-      if (!user) {
-        user = await findUserByUsername(username);
-      }
-      console.log('Fallback lookup result:', user ? 'Found user' : 'User not found');
+      console.log('MongoDB error:', dbError.message);
+      return res.status(500).json({ message: 'Database connection failed' });
     }
 
     if (!user) {

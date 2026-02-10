@@ -580,7 +580,7 @@ const setupMemoryMonitoring = () => {
 // MongoDB connection
 const connectDB = async () => {
     try {
-        const mongoURI = process.env.MONGODB_URI || 'mongodb+srv://servandoytio:qDn2Se8cKbWaPCeN@merncluster.2veth.mongodb.net/queueing-system?appName=mernCluster';
+        const mongoURI = process.env.MONGODB_URI;
         console.log('🔗 Connecting to MongoDB...');
         console.log('🔗 MongoDB URI:', mongoURI);
         

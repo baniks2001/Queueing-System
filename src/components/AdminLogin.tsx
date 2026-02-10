@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { LockClosedIcon, UserIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 
-// Get superadmin credentials from environment
-const SUPERADMIN_USERNAME = import.meta.env.VITE_SUPERADMIN_USERNAME || 'superadmin';
-const SUPERADMIN_PASSWORD = import.meta.env.VITE_SUPERADMIN_PASSWORD || 'SuperAdmin123!';
+// Get superadmin credentials from environment (no fallbacks)
+const SUPERADMIN_USERNAME = import.meta.env.VITE_SUPERADMIN_USERNAME;
+const SUPERADMIN_PASSWORD = import.meta.env.VITE_SUPERADMIN_PASSWORD;
 
 const AdminLogin: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -15,15 +15,16 @@ const AdminLogin: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  // Auto-detect superadmin credentials
+  // Handle input changes with superadmin detection
   const handleInputChange = (field: 'username' | 'password', value: string) => {
     if (field === 'username') {
       setUsername(value);
-      // Check if username matches superadmin (case-insensitive)
-      const isSuperAdmin = value.toLowerCase() === SUPERADMIN_USERNAME.toLowerCase();
-      if (isSuperAdmin) {
-        // Auto-set password if superadmin username is detected
-        setPassword(SUPERADMIN_PASSWORD);
+      // Auto-dect superadmin if environment variables are set
+      if (SUPERADMIN_USERNAME && SUPERADMIN_PASSWORD) {
+        const isSuperAdmin = value.toLowerCase() === SUPERADMIN_USERNAME.toLowerCase();
+        if (isSuperAdmin) {
+          setPassword(SUPERADMIN_PASSWORD);
+        }
       }
     } else if (field === 'password') {
       setPassword(value);
@@ -36,8 +37,11 @@ const AdminLogin: React.FC = () => {
     setError('');
 
     try {
-      // Auto-detect superadmin based on credentials
-      const isSuperAdmin = username.toLowerCase() === SUPERADMIN_USERNAME.toLowerCase() && password === SUPERADMIN_PASSWORD;
+      // Detect if this is a superadmin login (only if env vars are set)
+      const isSuperAdmin = SUPERADMIN_USERNAME && SUPERADMIN_PASSWORD && 
+        username.toLowerCase() === SUPERADMIN_USERNAME.toLowerCase() && 
+        password === SUPERADMIN_PASSWORD;
+      
       await login(username, password, isSuperAdmin);
       navigate('/admin/dashboard');
     } catch (error: unknown) {
@@ -51,9 +55,6 @@ const AdminLogin: React.FC = () => {
     }
   };
 
-  // Check if current credentials match superadmin
-  const isSuperAdminDetected = username.toLowerCase() === SUPERADMIN_USERNAME.toLowerCase() && password === SUPERADMIN_PASSWORD;
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center px-2 sm:px-4 lg:px-8 py-4">
       <div className="w-full max-w-md mx-auto">
@@ -64,17 +65,8 @@ const AdminLogin: React.FC = () => {
             </div>
             <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3 sm:mb-4">Admin Login</h2>
             <p className="text-lg sm:text-xl text-gray-600 mt-2">
-              {isSuperAdminDetected ? 'Super Administrator' : 'Administrator'} Access
+              Administrator Access
             </p>
-            {isSuperAdminDetected && (
-              <div className="mt-3 sm:mt-4 p-2 sm:p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="text-xs sm:text-sm text-yellow-800">
-                  <strong>🔑 Super Admin Mode Detected</strong><br />
-                  Username: {SUPERADMIN_USERNAME}<br />
-                  Password: {SUPERADMIN_PASSWORD}
-                </p>
-              </div>
-            )}
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
