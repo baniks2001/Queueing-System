@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { getApiUrl } from '../config/api';
+import { useToast } from '../contexts/ToastContext';
+import { getApiUrl, getUploadUrl } from '../config/api';
+import ConfirmationModal from './ConfirmationModal';
 import {
   QueueListIcon,
   TicketIcon,
@@ -55,13 +57,18 @@ const AdminDashboard: React.FC = () => {
   const [isKioskOpen, setIsKioskOpen] = useState(false);
   const [kioskStatus, setKioskStatus] = useState<'open' | 'standby' | 'closed'>('closed');
   const [kioskTitle, setKioskTitle] = useState('Queue Management System');
+  const [governmentOfficeName, setGovernmentOfficeName] = useState('Government Office');
+  const [logo, setLogo] = useState<string | null>(null);
   const [transactionHistory, setTransactionHistory] = useState<TransactionHistory[]>([]);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
   const [closeModalData, setCloseModalData] = useState<any>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<TransactionHistory | null>(null);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { showSuccess, showError, showWarning, showInfo } = useToast();
 
   // Define tabs first
   const tabs = [
@@ -125,6 +132,8 @@ const AdminDashboard: React.FC = () => {
         setKioskStatus(data.status || 'closed');
         setIsKioskOpen(data.isOpen || false);
         setKioskTitle(data.title || 'Queue Management System');
+        setGovernmentOfficeName(data.governmentOfficeName || 'Government Office');
+        setLogo(data.logo || null);
       }
     } catch (error) {
       console.error('Error fetching kiosk status:', error);
@@ -152,7 +161,7 @@ const AdminDashboard: React.FC = () => {
   const openKiosk = async () => {
     // Check if title is set before opening kiosk
     if (!kioskTitle || kioskTitle.trim() === '') {
-      alert('Please set a kiosk title before opening the kiosk.');
+      showWarning('Kiosk Title Required', 'Please set a kiosk title before opening the kiosk.');
       return;
     }
 
@@ -164,7 +173,10 @@ const AdminDashboard: React.FC = () => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ title: kioskTitle })
+        body: JSON.stringify({ 
+          title: kioskTitle,
+          governmentOfficeName: governmentOfficeName
+        })
       });
       
       if (response.ok) {
@@ -175,7 +187,7 @@ const AdminDashboard: React.FC = () => {
       }
     } catch (error) {
       console.error('Error opening kiosk:', error);
-      alert('Error opening kiosk');
+      showError('Failed to Open Kiosk', 'An error occurred while opening the kiosk. Please try again.');
     }
   };
 
@@ -188,27 +200,50 @@ const AdminDashboard: React.FC = () => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ title: kioskTitle })
+        body: JSON.stringify({ 
+          title: kioskTitle,
+          governmentOfficeName: governmentOfficeName
+        })
       });
       
       if (response.ok) {
         setKioskStatus('standby');
         setIsKioskOpen(false);
-        alert('Public Kiosk set to standby successfully!');
+        showSuccess('Kiosk on Standby', 'Public Kiosk has been set to standby successfully!');
       }
     } catch (error) {
       console.error('Error setting kiosk to standby:', error);
-      alert('Error setting kiosk to standby');
+      showError('Failed to Set Standby', 'An error occurred while setting kiosk to standby. Please try again.');
     }
   };
 
   const closeKiosk = async () => {
-    if (!confirm('Are you sure you want to close the kiosk? This will save all transactions and reset queue numbers.')) {
-      return;
-    }
+    setShowCloseModal(true);
+  };
 
+  const confirmCloseKiosk = async () => {
+    setShowCloseModal(false);
     try {
       const token = localStorage.getItem('token');
+      
+      // Reset on-hold queues first
+      console.log('🔄 Resetting on-hold queues...');
+      const resetOnHoldResponse = await fetch(getApiUrl('/api/queue/reset-on-hold'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        }
+      });
+      
+      if (resetOnHoldResponse.ok) {
+        const resetData = await resetOnHoldResponse.json();
+        console.log(`✅ Reset ${resetData.resetQueues} on-hold queues and deleted ${resetData.deletedOnHoldRecords} records`);
+      } else {
+        console.warn('⚠️ Failed to reset on-hold queues');
+      }
+      
+      // Close kiosk
       const response = await fetch(getApiUrl('/api/kiosk/close'), {
         method: 'POST',
         headers: {
@@ -227,7 +262,7 @@ const AdminDashboard: React.FC = () => {
           setCloseModalData(data.transactionHistory);
           setShowCloseModal(true);
         } else {
-          alert('Public Kiosk closed successfully! No transactions to save.');
+          showSuccess('Kiosk Closed', 'Public Kiosk closed successfully! No transactions to save. All on-hold queues have been reset.');
         }
         
         fetchTransactionHistory();
@@ -235,7 +270,7 @@ const AdminDashboard: React.FC = () => {
       }
     } catch (error) {
       console.error('Error closing kiosk:', error);
-      alert('Error closing kiosk');
+      showError('Failed to Close Kiosk', 'An error occurred while closing the kiosk. Please try again.');
     }
   };
 
@@ -248,25 +283,75 @@ const AdminDashboard: React.FC = () => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ title: kioskTitle })
+        body: JSON.stringify({ 
+          title: kioskTitle,
+          governmentOfficeName: governmentOfficeName
+        })
       });
       
       if (response.ok) {
         const data = await response.json();
-        alert('Kiosk title updated successfully!');
+        showSuccess('Settings Updated', 'Kiosk settings have been updated successfully!');
         // Update local state with the response
         if (data.status) {
           setKioskStatus(data.status.status || 'closed');
           setIsKioskOpen(data.status.isOpen || false);
           setKioskTitle(data.status.title || kioskTitle);
+          setGovernmentOfficeName(data.status.governmentOfficeName || governmentOfficeName);
+          setLogo(data.status.logo || logo);
         }
       } else {
         const errorData = await response.json();
-        alert(`Error updating title: ${errorData.message || 'Unknown error'}`);
+        showError('Update Failed', `Error updating settings: ${errorData.message || 'Unknown error'}`);
       }
     } catch (error) {
-      console.error('Error updating kiosk title:', error);
-      alert('Error updating kiosk title');
+      console.error('Error updating kiosk settings:', error);
+      showError('Update Failed', 'An error occurred while updating kiosk settings. Please try again.');
+    }
+  };
+
+  const uploadLogo = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Check file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      showWarning('File Too Large', 'File size must be less than 5MB');
+      return;
+    }
+
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      showWarning('Invalid File Type', 'Only image files are allowed');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const formData = new FormData();
+      formData.append('logo', file);
+
+      const response = await fetch(getApiUrl('/api/kiosk/upload-logo'), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`
+          // Don't set Content-Type header for FormData - browser sets it automatically
+        },
+        body: formData
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        showSuccess('Logo Uploaded', 'Logo has been uploaded successfully!');
+        setLogo(data.logo);
+        fetchKioskStatus(); // Refresh kiosk status
+      } else {
+        const errorData = await response.json();
+        showError('Upload Failed', `Error uploading logo: ${errorData.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error uploading logo:', error);
+      showError('Upload Failed', 'An error occurred while uploading the logo. Please try again.');
     }
   };
 
@@ -290,18 +375,22 @@ const AdminDashboard: React.FC = () => {
       }
     } catch (error) {
       console.error('Error exporting transaction:', error);
-      alert('Error exporting transaction');
+      showError('Export Failed', 'An error occurred while exporting the transaction. Please try again.');
     }
   };
 
   const deleteTransaction = async (transactionId: string) => {
-    if (!confirm('Are you sure you want to delete this transaction record?')) {
-      return;
-    }
+    setSelectedTransactionId(transactionId);
+    setShowDeleteModal(true);
+  };
 
+  const confirmDeleteTransaction = async () => {
+    setShowDeleteModal(false);
+    if (!selectedTransactionId) return;
+    
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(getApiUrl(`/api/kiosk/transactions/${transactionId}`), {
+      const response = await fetch(getApiUrl(`/api/kiosk/transactions/${selectedTransactionId}`), {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`
@@ -309,12 +398,12 @@ const AdminDashboard: React.FC = () => {
       });
       
       if (response.ok) {
-        setTransactionHistory(prev => prev.filter(t => t._id !== transactionId));
-        alert('Transaction deleted successfully');
+        setTransactionHistory(prev => prev.filter(t => t._id !== selectedTransactionId));
+        showSuccess('Transaction Deleted', 'Transaction has been deleted successfully.');
       }
     } catch (error) {
       console.error('Error deleting transaction:', error);
-      alert('Error deleting transaction');
+      showError('Deletion Failed', 'An error occurred while deleting the transaction. Please try again.');
     }
   };
 
@@ -328,80 +417,60 @@ const AdminDashboard: React.FC = () => {
   };
 
   const renderDashboard = () => (
-    <div>
-      {/* Kiosk Status - Prominent Display like Election System */}
+    <div className="space-y-6">
+      {/* Kiosk Status - Modern Card */}
       {user?.role === 'super_admin' && (
-        <div className="mb-6 sm:mb-8 bg-white rounded-lg shadow-xl border-2 border-gray-200 p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6 space-y-4 sm:space-y-0">
-            <div className="flex items-center space-x-3 sm:space-x-4">
-              <div className={`w-3 h-3 sm:w-4 sm:h-4 rounded-full ${
-                isKioskOpen ? 'bg-green-500' : 
-                kioskStatus === 'standby' ? 'bg-yellow-500' : 'bg-red-500'
-              }`}></div>
-              <div>
-                <h3 className="text-lg sm:text-xl font-bold text-gray-900">
-                  Kiosk Status: <span className={
-                    isKioskOpen ? 'text-green-600' : 
-                    kioskStatus === 'standby' ? 'text-yellow-600' : 'text-red-600'
-                  }>
-                    {isKioskOpen ? 'OPEN' : kioskStatus === 'standby' ? 'STANDBY' : 'CLOSED'}
-                  </span>
-                </h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  {isKioskOpen ? 'Public kiosk is currently accepting queue numbers' : 'Public kiosk is closed'}
-                </p>
+        <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+          <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className={`w-4 h-4 rounded-full ${
+                  isKioskOpen ? 'bg-green-400 shadow-lg shadow-green-400/50' : 
+                  kioskStatus === 'standby' ? 'bg-yellow-400 shadow-lg shadow-yellow-400/50' : 'bg-red-400 shadow-lg shadow-red-400/50'
+                } animate-pulse`}></div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">
+                    Kiosk Status: <span className="font-light">
+                      {isKioskOpen ? 'OPEN' : kioskStatus === 'standby' ? 'STANDBY' : 'CLOSED'}
+                    </span>
+                  </h3>
+                  <p className="text-blue-100 text-sm mt-1">
+                    {isKioskOpen ? 'Public kiosk is currently accepting queue numbers' : 'Public kiosk is closed'}
+                  </p>
+                </div>
               </div>
-            </div>
-            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 w-full sm:w-auto">
-              {!isKioskOpen ? (
-                <button
-                  onClick={openKiosk}
-                  className="flex items-center justify-center px-4 py-2 sm:px-6 sm:py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200 text-sm sm:text-base"
-                >
-                  <PlayIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                  Open Kiosk
-                </button>
-              ) : (
-                <>
-                  <button
-                    onClick={closeKiosk}
-                    className="flex items-center justify-center px-4 py-2 sm:px-6 sm:py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200 text-sm sm:text-base"
-                  >
-                    <StopIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                    Close Kiosk
-                  </button>
-                  <button
-                    onClick={standbyKiosk}
-                    className="flex items-center justify-center px-4 py-2 sm:px-6 sm:py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors duration-200 text-sm sm:text-base"
-                  >
-                    <ClockIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                    Standby
-                  </button>
-                </>
-              )}
             </div>
           </div>
           
-          {/* Title Input - Always visible */}
-          <div className="mt-4 p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex flex-col space-y-2">
+          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+            <div className="flex flex-col lg:flex-row gap-4">
               <div className="flex-1">
-                <h4 className="text-sm font-medium text-blue-800 mb-2">
+                <h4 className="text-sm font-semibold text-gray-700 mb-2">Government Office/Company Name:</h4>
+                <input
+                  type="text"
+                  value={governmentOfficeName}
+                  onChange={(e) => setGovernmentOfficeName(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all duration-200"
+                  placeholder="Enter government office or company name"
+                />
+              </div>
+              <div className="flex-1">
+                <h4 className="text-sm font-semibold text-gray-700 mb-2">
                   {isKioskOpen ? 'Current Title:' : 'Set Kiosk Title:'}
                 </h4>
-                <div className="flex items-center space-x-2">
+                <div className="flex gap-2">
                   <input
                     type="text"
                     value={kioskTitle}
                     onChange={(e) => setKioskTitle(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all duration-200"
                     placeholder="Enter kiosk title"
                   />
                   <button
                     onClick={updateKioskTitle}
-                    className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                    className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-sm transition-all duration-200 shadow-md hover:shadow-lg"
                   >
-                    Update
+                    Update Settings
                   </button>
                 </div>
                 {!isKioskOpen && (!kioskTitle || kioskTitle.trim() === '') && (
@@ -409,92 +478,166 @@ const AdminDashboard: React.FC = () => {
                 )}
               </div>
             </div>
+
+            {/* Logo Upload */}
+            <div className="mt-4 pt-4 border-t border-gray-300">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">Logo Upload:</h4>
+              <div className="flex items-center space-x-4">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={uploadLogo}
+                  className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition-all duration-200"
+                />
+                {logo && (
+                  <div className="flex items-center space-x-3">
+                    <img 
+                      src={getUploadUrl(logo)} 
+                      alt="Logo" 
+                      className="h-12 w-12 object-contain border border-gray-300 rounded-lg shadow-sm"
+                      onError={(e) => {
+                        console.error('Logo failed to load:', getUploadUrl(logo));
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                    <span className="text-sm text-green-600 font-medium">Logo uploaded successfully</span>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-2">Upload a logo (max 5MB, image files only)</p>
+            </div>
+          </div>
+          
+          {/* Kiosk Control Buttons */}
+          <div className="px-6 pb-4">
+            <div className="flex flex-col sm:flex-row gap-3">
+              {!isKioskOpen ? (
+                <button
+                  onClick={openKiosk}
+                  className="flex items-center justify-center px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-200 text-sm font-semibold shadow-lg hover:shadow-xl transform hover:scale-105"
+                >
+                  <PlayIcon className="w-5 h-5 mr-2" />
+                  Open Kiosk
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={closeKiosk}
+                    className="flex items-center justify-center px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl hover:from-red-700 hover:to-red-800 transition-all duration-200 text-sm font-semibold shadow-lg hover:shadow-xl transform hover:scale-105"
+                  >
+                    <StopIcon className="w-5 h-5 mr-2" />
+                    Close Kiosk
+                  </button>
+                  <button
+                    onClick={standbyKiosk}
+                    className="flex items-center justify-center px-6 py-3 bg-gradient-to-r from-yellow-600 to-yellow-700 text-white rounded-xl hover:from-yellow-700 hover:to-yellow-800 transition-all duration-200 text-sm font-semibold shadow-lg hover:shadow-xl transform hover:scale-105"
+                  >
+                    <ClockIcon className="w-5 h-5 mr-2" />
+                    Standby
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        <div className="card bg-gradient-to-r from-blue-500 to-blue-600 text-white p-4 sm:p-6">
+      {/* Modern Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 border border-blue-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-blue-100 text-sm sm:text-base">Total Queues Today</p>
-              <p className="text-2xl sm:text-3xl font-bold">{stats.totalQueues}</p>
+              <p className="text-blue-100 text-sm font-medium uppercase tracking-wide">Total Queues Today</p>
+              <p className="text-3xl font-bold mt-1">{stats.totalQueues}</p>
             </div>
-            <QueueListIcon className="w-10 h-10 sm:w-12 sm:h-12 text-blue-200" />
+            <div className="bg-blue-500/20 p-3 rounded-xl">
+              <QueueListIcon className="w-8 h-8 text-blue-100" />
+            </div>
           </div>
         </div>
-        <div className="card bg-gradient-to-r from-green-500 to-green-600 text-white p-4 sm:p-6">
+        <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 text-white p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 border border-emerald-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-green-100 text-sm sm:text-base">Currently Waiting</p>
-              <p className="text-2xl sm:text-3xl font-bold">{stats.waitingQueues}</p>
+              <p className="text-emerald-100 text-sm font-medium uppercase tracking-wide">Currently Waiting</p>
+              <p className="text-3xl font-bold mt-1">{stats.waitingQueues}</p>
             </div>
-            <UserGroupIcon className="w-10 h-10 sm:w-12 sm:h-12 text-green-200" />
+            <div className="bg-emerald-500/20 p-3 rounded-xl">
+              <UserGroupIcon className="w-8 h-8 text-emerald-100" />
+            </div>
           </div>
         </div>
-        <div className="card bg-gradient-to-r from-purple-500 to-purple-600 text-white p-4 sm:p-6">
+        <div className="bg-gradient-to-br from-purple-600 to-purple-700 text-white p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 border border-purple-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-purple-100 text-sm sm:text-base">Currently Serving</p>
-              <p className="text-2xl sm:text-3xl font-bold">{stats.servingQueues}</p>
+              <p className="text-purple-100 text-sm font-medium uppercase tracking-wide">Currently Serving</p>
+              <p className="text-3xl font-bold mt-1">{stats.servingQueues}</p>
             </div>
-            <TicketIcon className="w-10 h-10 sm:w-12 sm:h-12 text-purple-200" />
+            <div className="bg-purple-500/20 p-3 rounded-xl">
+              <TicketIcon className="w-8 h-8 text-purple-100" />
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Transaction History */}
+      {/* Modern Transaction History */}
       {user?.role === 'super_admin' && (
-        <div className="mt-6 sm:mt-8 bg-white rounded-lg shadow-lg p-4 sm:p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg sm:text-xl font-semibold text-gray-900">Recent Transaction History</h3>
-            <button
-              onClick={() => setShowHistoryModal(true)}
-              className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-            >
-              View All
-            </button>
+        <div className="mt-8 bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+          <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+            <div className="flex justify-between items-center">
+              <h3 className="text-xl font-bold text-gray-900">Recent Transaction History</h3>
+              <button
+                onClick={() => setShowHistoryModal(true)}
+                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 text-sm font-medium shadow-md hover:shadow-lg"
+              >
+                <MagnifyingGlassIcon className="w-4 h-4 mr-2" />
+                View All
+              </button>
+            </div>
           </div>
           
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
-                  <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                  <th className="hidden sm:table-cell px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Title</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Total</th>
+                  <th className="hidden sm:table-cell px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white divide-y divide-gray-100">
                 {transactionHistory.slice(0, 5).map((transaction) => (
-                  <tr key={transaction._id}>
-                    <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-sm text-gray-900">
+                  <tr key={transaction._id} className="hover:bg-gray-50 transition-colors duration-150">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
                       {new Date(transaction.date).toLocaleDateString()}
                     </td>
-                    <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {transaction.title}
                     </td>
-                    <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-sm text-gray-900">
-                      {transaction.totalTransactions}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                        {transaction.totalTransactions}
+                      </span>
                     </td>
-                    <td className="hidden sm:table-cell px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-sm font-medium">
+                    <td className="hidden sm:table-cell px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-2">
                         <button
                           onClick={() => viewTransaction(transaction)}
-                          className="text-blue-600 hover:text-blue-900 p-1"
+                          className="text-blue-600 hover:text-blue-900 p-2 hover:bg-blue-50 rounded-lg transition-all duration-200"
+                          title="View Transaction"
                         >
                           <MagnifyingGlassIcon className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => exportTransaction(transaction)}
-                          className="text-green-600 hover:text-green-900 p-1"
+                          className="text-green-600 hover:text-green-900 p-2 hover:bg-green-50 rounded-lg transition-all duration-200"
+                          title="Export Transaction"
                         >
                           <DocumentArrowDownIcon className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => deleteTransaction(transaction._id)}
-                          className="text-red-600 hover:text-red-900 p-1"
+                          className="text-red-600 hover:text-red-900 p-2 hover:bg-red-50 rounded-lg transition-all duration-200"
+                          title="Delete Transaction"
                         >
                           <TrashIcon className="w-4 h-4" />
                         </button>
@@ -505,8 +648,11 @@ const AdminDashboard: React.FC = () => {
               </tbody>
             </table>
             {transactionHistory.length === 0 && (
-              <div className="text-center py-8 text-gray-500">
-                No transaction history available
+              <div className="text-center py-12 text-gray-500">
+                <div className="flex flex-col items-center">
+                  <DocumentArrowDownIcon className="w-12 h-12 text-gray-300 mb-3" />
+                  <p className="text-lg font-medium">No transaction history available</p>
+                </div>
               </div>
             )}
           </div>
@@ -751,26 +897,52 @@ const AdminDashboard: React.FC = () => {
       {/* Close Modal */}
       {renderCloseModal()}
       
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center py-3 sm:py-4 space-y-3 sm:space-y-0">
-            <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-              <span className="text-sm text-gray-500">
-                Welcome, {user?.username}
-              </span>
+      {/* Confirmation Modals */}
+      <ConfirmationModal
+        isOpen={showCloseModal}
+        onClose={() => setShowCloseModal(false)}
+        onConfirm={confirmCloseKiosk}
+        title="Close Kiosk"
+        message="Are you sure you want to close the kiosk? This will save all transactions, reset queue numbers, and clear all on-hold queues."
+        confirmText="Close Kiosk"
+        cancelText="Cancel"
+        type="warning"
+      />
+      
+      <ConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={confirmDeleteTransaction}
+        title="Delete Transaction"
+        message="Are you sure you want to delete this transaction record? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        type="danger"
+      />
+      
+      {/* Dark Blue Header */}
+      <header className="bg-gradient-to-r from-blue-900 to-blue-800 shadow-lg border-b border-blue-700">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center py-4 sm:py-6 space-y-4 sm:space-y-0">
+            <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-6">
+              <div className="text-center sm:text-left">
+                <h1 className="text-2xl sm:text-3xl font-bold text-white">Admin Dashboard</h1>
+                <span className="text-blue-200 text-sm sm:text-base block mt-1">
+                  Welcome back, <span className="font-semibold text-white">{user?.username}</span>
+                </span>
+              </div>
             </div>
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
               <button
                 onClick={() => navigate('/display')}
-                className="btn-secondary flex items-center justify-center px-3 py-2 sm:px-4 text-sm"
+                className="flex items-center justify-center px-4 py-2.5 bg-blue-700 text-white rounded-lg hover:bg-blue-600 transition-all duration-200 text-sm font-medium shadow-md hover:shadow-lg transform hover:scale-105"
               >
                 <EyeIcon className="w-4 h-4 mr-2" />
                 View Display
               </button>
               <button
                 onClick={handleLogout}
-                className="btn-secondary flex items-center justify-center px-3 py-2 sm:px-4 text-sm"
+                className="flex items-center justify-center px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all duration-200 text-sm font-medium shadow-md hover:shadow-lg transform hover:scale-105"
               >
                 <ArrowRightOnRectangleIcon className="w-4 h-4 mr-2" />
                 Logout
@@ -780,29 +952,32 @@ const AdminDashboard: React.FC = () => {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
-        <div className="mb-6 sm:mb-8">
-          <nav className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-1">
+      {/* Modern Navigation Tabs */}
+      <div className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <nav className="flex space-x-1 py-1 overflow-x-auto">
             {filteredTabs.map((tab) => {
               const IconComponent = tab.icon;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center justify-center px-3 py-2 sm:px-4 rounded-lg font-medium transition-colors duration-200 text-sm sm:text-base ${
+                  className={`flex items-center justify-center px-4 py-3 rounded-xl font-medium transition-all duration-200 text-sm whitespace-nowrap ${
                     activeTab === tab.id
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                      ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md transform scale-105'
+                      : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50 hover:shadow-sm'
                   }`}
                 >
-                  <IconComponent className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                  {tab.name}
+                  <IconComponent className={`w-5 h-5 mr-2 ${activeTab === tab.id ? 'text-white' : 'text-gray-400'}`} />
+                  <span className="font-medium">{tab.name}</span>
                 </button>
               );
             })}
           </nav>
         </div>
+      </div>
 
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <div>
           {activeTab === 'dashboard' && renderDashboard()}
           {activeTab === 'users' && <UserManagement />}

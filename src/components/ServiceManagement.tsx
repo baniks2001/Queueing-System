@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getApiUrl } from '../config/api';
+import { useToast } from '../contexts/ToastContext';
+import ConfirmationModal from './ConfirmationModal';
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 
 interface WindowUser {
@@ -34,7 +36,10 @@ const ServiceManagement: React.FC = () => {
   const [windowUsers, setWindowUsers] = useState<WindowUser[]>([]);
   const [editingFlow, setEditingFlow] = useState<TransactionFlow | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedFlowId, setSelectedFlowId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const { showSuccess, showError } = useToast();
   
   const [formData, setFormData] = useState({
     name: '',
@@ -129,13 +134,15 @@ const ServiceManagement: React.FC = () => {
         setIsModalOpen(false);
         setEditingFlow(null);
         resetForm();
+        const action = editingFlow ? 'updated' : 'created';
+        showSuccess('Transaction Flow Saved', `Transaction flow has been ${action} successfully.`);
       } else {
         const error = await response.json();
-        alert(error.message || 'Failed to save transaction flow');
+        showError('Save Failed', error.message || 'Failed to save transaction flow');
       }
     } catch (error) {
       console.error('Error saving transaction flow:', error);
-      alert('Error saving transaction flow. Please try again.');
+      showError('Save Failed', 'Error saving transaction flow. Please try again.');
     }
   };
 
@@ -151,11 +158,17 @@ const ServiceManagement: React.FC = () => {
   };
 
   const handleDelete = async (flowId: string) => {
-    if (!confirm('Are you sure you want to delete this transaction flow?')) return;
+    setSelectedFlowId(flowId);
+    setShowDeleteModal(true);
+  };
 
+  const confirmDelete = async () => {
+    setShowDeleteModal(false);
+    if (!selectedFlowId) return;
+    
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(getApiUrl(`/api/admin/transaction-flow/${flowId}`), {
+      const response = await fetch(getApiUrl(`/api/admin/transaction-flow/${selectedFlowId}`), {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`
@@ -164,13 +177,14 @@ const ServiceManagement: React.FC = () => {
 
       if (response.ok) {
         await fetchTransactionFlows();
+        showSuccess('Transaction Flow Deleted', 'Transaction flow has been deleted successfully.');
       } else {
         const error = await response.json();
-        alert(error.message || 'Failed to delete transaction flow');
+        showError('Deletion Failed', error.message || 'Failed to delete transaction flow');
       }
     } catch (error) {
       console.error('Error deleting transaction flow:', error);
-      alert('Error deleting transaction flow. Please try again.');
+      showError('Deletion Failed', 'Error deleting transaction flow. Please try again.');
     }
   };
 
@@ -207,7 +221,7 @@ const ServiceManagement: React.FC = () => {
     });
   };
 
-  const updateStep = (stepId: string, field: keyof TransactionStep, value: any) => {
+  const updateStep = (stepId: string, field: keyof TransactionStep, value: TransactionStep[keyof TransactionStep]) => {
     setFormData({
       ...formData,
       steps: formData.steps.map(step =>
@@ -471,6 +485,18 @@ const ServiceManagement: React.FC = () => {
           </div>
         </div>
       )}
+      
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={confirmDelete}
+        title="Delete Transaction Flow"
+        message="Are you sure you want to delete this transaction flow? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        type="danger"
+      />
     </div>
   );
 };

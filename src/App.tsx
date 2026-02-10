@@ -8,6 +8,7 @@ import WindowDashboard from './components/WindowDashboard';
 import PublicDisplay from './components/PublicDisplay';
 import { AuthProvider } from './contexts/AuthContext';
 import { QueueProvider } from './contexts/QueueContext';
+import { ToastProvider } from './contexts/ToastContext';
 import { CONFIG } from './config/app-config';
 
 // Connection Test Component - Non-blocking
@@ -26,8 +27,28 @@ const ConnectionTest = () => {
       }
     };
     
+    // IP Synchronization
+    const syncIP = async () => {
+      try {
+        const success = await CONFIG.syncIPWithServer();
+        if (success) {
+          console.log('✅ IP synchronized with server');
+        } else {
+          console.error('❌ Failed to sync IP with server');
+        }
+      } catch (error) {
+        console.error('❌ Error during IP synchronization:', error);
+      }
+    };
+    
+    // Test connection and sync IP after component mounts
+    const initializeConnection = async () => {
+      await testConnection();
+      await syncIP();
+    };
+    
     // Test connection after a short delay to not block initial render
-    const timer = setTimeout(testConnection, 1000);
+    const timer = setTimeout(initializeConnection, 1000);
     return () => clearTimeout(timer);
   }, []);
 
@@ -39,20 +60,22 @@ function App() {
   return (
     <AuthProvider>
       <QueueProvider>
-        <Router>
-          <div className="min-h-screen bg-gray-50">
-            <ConnectionTest />
-            <Routes>
-              <Route path="/" element={<PublicKiosk />} />
-              <Route path="/admin/login" element={<AdminLogin />} />
-              <Route path="/window/login" element={<WindowLogin />} />
-              <Route path="/admin/dashboard" element={<AdminDashboard />} />
-              <Route path="/window/dashboard" element={<WindowDashboard />} />
-              <Route path="/window/:windowNumber" element={<WindowDashboard />} />
-              <Route path="/display" element={<PublicDisplay />} />
-            </Routes>
-          </div>
-        </Router>
+        <ToastProvider>
+          <Router>
+            <div className="min-h-screen bg-gray-50">
+              <ConnectionTest />
+              <Routes>
+                <Route path="/" element={<PublicKiosk />} />
+                <Route path="/admin/login" element={<AdminLogin />} />
+                <Route path="/window/login" element={<WindowLogin />} />
+                <Route path="/admin/dashboard" element={<AdminDashboard />} />
+                <Route path="/window/dashboard" element={<WindowDashboard />} />
+                <Route path="/window/:windowNumber" element={<WindowDashboard />} />
+                <Route path="/display" element={<PublicDisplay />} />
+              </Routes>
+            </div>
+          </Router>
+        </ToastProvider>
       </QueueProvider>
     </AuthProvider>
   );

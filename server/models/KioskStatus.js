@@ -12,6 +12,16 @@ const kioskStatusSchema = new mongoose.Schema({
     default: 'Queue Management System',
     required: true
   },
+  governmentOfficeName: {
+    type: String,
+    default: 'Government Office',
+    required: false
+  },
+  logo: {
+    type: String,
+    default: null,
+    required: false
+  },
   message: {
     type: String,
     default: 'System is initializing...'

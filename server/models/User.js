@@ -5,7 +5,6 @@ const userSchema = new mongoose.Schema({
   username: {
     type: String,
     required: true,
-    unique: true,
     trim: true
   },
   password: {
@@ -35,6 +34,9 @@ const userSchema = new mongoose.Schema({
     default: Date.now
   }
 });
+
+// Create unique index on username field explicitly
+userSchema.index({ username: 1 }, { unique: true });
 
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();

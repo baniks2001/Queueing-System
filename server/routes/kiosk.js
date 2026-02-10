@@ -1,9 +1,43 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const Queue = require('../models/Queue');
 const TransactionHistory = require('../models/TransactionHistory');
 const KioskStatus = require('../models/KioskStatus');
 const authMiddleware = require('../middleware/auth');
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = path.join(__dirname, '..', 'uploads');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    // Generate unique filename
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'logo-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: function (req, file, cb) {
+    // Accept only image files
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  }
+});
 
 // Get kiosk status (public endpoint - no auth required)
 router.get('/status', async (req, res) => {
@@ -18,6 +52,8 @@ router.get('/status', async (req, res) => {
       status: kioskStatus.status,
       isOpen: kioskStatus.isOpen, // Backward compatibility
       title: kioskStatus.title,
+      governmentOfficeName: kioskStatus.governmentOfficeName,
+      logo: kioskStatus.logo,
       message: kioskStatus.message,
       openedAt: kioskStatus.openedAt,
       standbyAt: kioskStatus.standbyAt,
@@ -35,13 +71,15 @@ router.get('/status', async (req, res) => {
 router.post('/open', authMiddleware, async (req, res) => {
   try {
     console.log('🔧 Kiosk open request received');
-    const { title, message } = req.body;
+    const { title, governmentOfficeName, message } = req.body;
     console.log('🔧 Requested title:', title);
+    console.log('🔧 Requested government office name:', governmentOfficeName);
     
     // Update kiosk status using the model method
     const updatedStatus = await KioskStatus.updateStatus({
       status: 'open',
       title: title || 'Queue Management System',
+      governmentOfficeName: governmentOfficeName || 'Government Office',
       message: message || 'Kiosk is now open for service'
     }, req.user?.id || null);
     
@@ -62,12 +100,13 @@ router.post('/open', authMiddleware, async (req, res) => {
 router.post('/standby', authMiddleware, async (req, res) => {
   try {
     console.log('🔧 Kiosk standby request received');
-    const { title, message } = req.body;
+    const { title, governmentOfficeName, message } = req.body;
     
     // Update kiosk status using the model method
     const updatedStatus = await KioskStatus.updateStatus({
       status: 'standby',
       title: title || 'Queue Management System',
+      governmentOfficeName: governmentOfficeName || 'Government Office',
       message: message || 'Kiosk is temporarily paused'
     }, req.user?.id || null);
     
@@ -252,10 +291,11 @@ router.get('/status/admin', authMiddleware, async (req, res) => {
 // Update kiosk settings (admin only)
 router.put('/settings', authMiddleware, async (req, res) => {
   try {
-    const { title, message, businessHours, autoOpenClose } = req.body;
+    const { title, governmentOfficeName, message, businessHours, autoOpenClose } = req.body;
     
     const updatedStatus = await KioskStatus.updateStatus({
       title,
+      governmentOfficeName,
       message,
       businessHours,
       autoOpenClose
@@ -267,6 +307,66 @@ router.put('/settings', authMiddleware, async (req, res) => {
     });
   } catch (error) {
     console.error('Error updating kiosk settings:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Upload logo (admin only)
+router.post('/upload-logo', authMiddleware, (req, res, next) => {
+  upload.single('logo')(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      console.log('❌ Multer error:', err);
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ message: 'File size too large (max 5MB)' });
+      }
+      return res.status(400).json({ message: 'File upload error: ' + err.message });
+    } else if (err) {
+      console.log('❌ Upload error:', err);
+      return res.status(400).json({ message: 'Upload error: ' + err.message });
+    }
+    next();
+  });
+}, async (req, res) => {
+  try {
+    console.log('🔧 Upload logo route hit');
+    console.log('🔧 Request file:', req.file);
+    console.log('🔧 Request body:', req.body);
+    
+    if (!req.file) {
+      console.log('❌ No file uploaded');
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    console.log('🔧 Logo upload request received:', req.file.filename);
+    
+    // Get current kiosk status
+    const currentStatus = await KioskStatus.getCurrentStatus();
+    
+    // Delete old logo if exists
+    if (currentStatus.logo) {
+      const oldLogoPath = path.join(__dirname, '..', 'uploads', currentStatus.logo);
+      if (fs.existsSync(oldLogoPath)) {
+        fs.unlinkSync(oldLogoPath);
+        console.log('🔧 Old logo deleted:', currentStatus.logo);
+      }
+    }
+    
+    // Update kiosk status with new logo filename
+    const updatedStatus = await KioskStatus.updateStatus({
+      logo: req.file.filename
+    }, req.user?.id || null);
+    
+    console.log('🔧 Logo uploaded successfully:', req.file.filename);
+    
+    res.json({
+      message: 'Logo uploaded successfully',
+      logo: req.file.filename,
+      logoUrl: `/uploads/${req.file.filename}`,
+      status: updatedStatus
+    });
+  } catch (error) {
+    console.error('❌ Error uploading logo:', error);
+    console.error('❌ Error stack:', error.stack);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });

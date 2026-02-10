@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { CONFIG } from '../config/app-config';
 import { getApiUrl } from '../config/api';
+import { useToast } from '../contexts/ToastContext';
+import ConfirmationModal from './ConfirmationModal';
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 
 interface PersonType {
@@ -22,13 +24,12 @@ const QueueManagement: React.FC = () => {
     priority: 'Low' as 'Low' | 'High',
     color: '#3B82F6'
   });
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const { showSuccess, showError } = useToast();
 
-  useEffect(() => {
-    fetchPersonTypes();
-  }, []);
-
-  const fetchPersonTypes = async () => {
+  const fetchPersonTypes = useCallback(async () => {
     setIsLoading(true);
     try {
       const token = localStorage.getItem('token');
@@ -54,11 +55,15 @@ const QueueManagement: React.FC = () => {
       setPersonTypes(data);
     } catch (error) {
       console.error('Error fetching person types:', error);
-      alert('Error fetching person types. Please check console for details.');
+      showError('Fetch Failed', 'Error fetching person types. Please check console for details.');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [showError]);
+
+  useEffect(() => {
+    fetchPersonTypes();
+  }, [fetchPersonTypes]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,10 +96,12 @@ const QueueManagement: React.FC = () => {
           priority: 'Low' as 'Low' | 'High',
           color: '#3B82F6'
         });
+        const action = editingType ? 'updated' : 'created';
+        showSuccess('Person Type Saved', `Person type has been ${action} successfully.`);
       }
     } catch (error) {
       console.error('Error saving person type:', error);
-      alert('Error saving person type. Please try again.');
+      showError('Save Failed', 'Error saving person type. Please try again.');
     }
   };
 
@@ -110,11 +117,17 @@ const QueueManagement: React.FC = () => {
   };
 
   const handleDelete = async (typeId: string) => {
-    if (!confirm('Are you sure you want to delete this person type?')) return;
+    setSelectedTypeId(typeId);
+    setShowDeleteModal(true);
+  };
 
+  const confirmDelete = async () => {
+    setShowDeleteModal(false);
+    if (!selectedTypeId) return;
+    
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(CONFIG.buildUrl(`/admin/person-type/${typeId}`), {
+      const response = await fetch(CONFIG.buildUrl(`/admin/person-type/${selectedTypeId}`), {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`
@@ -123,10 +136,14 @@ const QueueManagement: React.FC = () => {
 
       if (response.ok) {
         await fetchPersonTypes();
+        showSuccess('Person Type Deleted', 'Person type has been deleted successfully.');
+      } else {
+        const errorData = await response.json();
+        showError('Deletion Failed', errorData.message || 'Failed to delete person type.');
       }
     } catch (error) {
       console.error('Error deleting person type:', error);
-      alert('Error deleting person type. Please try again.');
+      showError('Deletion Failed', 'Error deleting person type. Please try again.');
     }
   };
 
@@ -301,6 +318,18 @@ const QueueManagement: React.FC = () => {
           </div>
         </div>
       )}
+      
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={confirmDelete}
+        title="Delete Person Type"
+        message="Are you sure you want to delete this person type? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        type="danger"
+      />
     </div>
   );
 };

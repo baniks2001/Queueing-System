@@ -3,10 +3,10 @@
 // Auto-startup script for Queue Management System
 // Automatically detects network configuration and starts both frontend and backend
 
-import { spawn, exec } from 'child_process';
-import path from 'path';
-import fs from 'fs';
-import os from 'os';
+const { spawn, exec } = require('child_process');
+const path = require('path');
+const fs = require('fs');
+const os = require('os');
 
 console.log('🚀 Queue Management System Auto-Startup Script');
 console.log('================================================');
@@ -256,11 +256,11 @@ async function main() {
 }
 
 // Run main function
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (require.main === module) {
     main();
 }
 
-export {
+module.exports = {
     detectNetworkConfiguration,
     updateEnvironmentFile,
     checkPortAvailability,

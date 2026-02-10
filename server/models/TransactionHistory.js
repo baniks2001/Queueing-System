@@ -39,7 +39,6 @@ const transactionHistorySchema = new mongoose.Schema({
 });
 
 // Index for efficient queries
-transactionHistorySchema.index({ date: 1 });
 transactionHistorySchema.index({ isOpen: 1 });
 
 module.exports = mongoose.model('TransactionHistory', transactionHistorySchema);

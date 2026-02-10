@@ -8,33 +8,62 @@ import {
   PrinterIcon,
   ClockIcon,
   CheckCircleIcon,
-  XMarkIcon
+  XMarkIcon,
+  ChevronDownIcon
 } from '@heroicons/react/24/outline';
 
+interface TransactionFlow {
+  _id: string;
+  name: string;
+  prefix: string;
+  description?: string;
+  color?: string;
+  steps: Array<{ id: string; stepNumber: number; stepName: string; windowNumber: number; description: string; isActive: boolean }>;
+  isActive: boolean;
+}
 
-
-
+interface PersonType {
+  _id: string;
+  name: string;
+  color?: string;
+  isActive: boolean;
+}
 
 const PublicKiosk: React.FC = () => {
-  const [selectedTransaction, setSelectedTransaction] = useState<string>('');
-  const [selectedPersonType, setSelectedPersonType] = useState<string>('');
+  const [selectedTransaction, setSelectedTransaction] = useState('');
+  const [selectedPersonType, setSelectedPersonType] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedQueue, setGeneratedQueue] = useState<any>(null);
-  const [kioskStatus, setKioskStatus] = useState<{ isOpen: boolean; title: string; message?: string; status?: string } | null>(null);
-  const [transactionFlows, setTransactionFlows] = useState<any[]>([]);
-  const [personTypes, setPersonTypes] = useState<any[]>([]);
+  const [generatedQueue, setGeneratedQueue] = useState<{
+    _id: string;
+    queueNumber: string;
+    personType: string;
+    service: string;
+    status: string;
+    createdAt: string;
+  } | null>(null);
+  const [kioskStatus, setKioskStatus] = useState<{ isOpen: boolean; title: string; message?: string; status?: string; governmentOfficeName?: string; logo?: string } | null>(null);
+  const [transactionFlows, setTransactionFlows] = useState<TransactionFlow[]>([]);
+  const [personTypes, setPersonTypes] = useState<PersonType[]>([]);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const navigate = useNavigate();
 
   // Test navigation on component mount
   React.useEffect(() => {
     console.log('PublicKiosk component mounted, navigation available:', typeof navigate);
-  }, []);
+  }, [navigate]);
 
 
   // Helper function to get API URL
   const getApiUrl = (endpoint: string) => {
     const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
     return `${baseUrl}${endpoint}`;
+  };
+
+  // Helper function to get upload URL
+  const getUploadUrl = (filename: string) => {
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    return `${baseUrl}/uploads/${filename}`;
   };
 
   // Fetch transaction flows from backend
@@ -62,7 +91,7 @@ const PublicKiosk: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         console.log('Person types from API:', data);
-        setPersonTypes(Array.isArray(data) ? data.filter((type: any) => type.isActive) : []);
+        setPersonTypes(Array.isArray(data) ? data.filter((type: { isActive: boolean }) => type.isActive) : []);
       } else {
         console.error('Failed to fetch person types:', response.statusText);
         setPersonTypes([]);
@@ -83,6 +112,8 @@ const PublicKiosk: React.FC = () => {
         setKioskStatus({
           isOpen: data.isOpen,
           title: data.title,
+          governmentOfficeName: data.governmentOfficeName,
+          logo: data.logo,
           message: data.message,
           status: data.status
         });
@@ -90,7 +121,7 @@ const PublicKiosk: React.FC = () => {
     } catch (error) {
       console.error('Error fetching kiosk status:', error);
       // Set default status if API fails
-      setKioskStatus({ isOpen: false, title: 'Queue Management System', status: 'closed' });
+      setKioskStatus({ isOpen: false, title: 'Queue Management System', governmentOfficeName: 'Government Office', logo: undefined, status: 'closed' });
     }
   };
 
@@ -102,8 +133,14 @@ const PublicKiosk: React.FC = () => {
     // Set up periodic status check every 30 seconds
     const interval = setInterval(fetchKioskStatus, 30000);
     
-    return () => clearInterval(interval);
-  }, []);
+    // Set up timer for current time
+    const timeInterval = setInterval(() => setCurrentTime(new Date()), 1000);
+    
+    return () => {
+      clearInterval(interval);
+      clearInterval(timeInterval);
+    };
+  }, [fetchKioskStatus, fetchPersonTypes, fetchTransactionFlows]);
 
   const handleGenerateQueue = async () => {
     if (!selectedTransaction) {
@@ -144,7 +181,14 @@ const PublicKiosk: React.FC = () => {
     }
   };
 
-  const printQueue = (queue: any) => {
+  const printQueue = (queue: {
+    _id: string;
+    queueNumber: string;
+    personType: string;
+    service: string;
+    status: string;
+    createdAt: string;
+  }) => {
     const printWindow = window.open('', '_blank');
     if (printWindow) {
       printWindow.document.write(`
@@ -239,33 +283,44 @@ const PublicKiosk: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      {/* Modern Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      {/* Modern Header - Dark Blue */}
+      <header className="bg-blue-800 shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center py-3 sm:py-4 space-y-3 sm:space-y-0">
             {/* System Title */}
             <div className="flex items-center space-x-3">
-              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-2 sm:p-3 rounded-xl">
-                <TicketIcon className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
-              </div>
+              {/* Logo */}
+              {kioskStatus?.logo && (
+                <img 
+                  src={getUploadUrl(kioskStatus.logo!)} 
+                  alt="Government Office Logo" 
+                  className="h-12 w-12 sm:h-14 sm:w-14 object-contain"
+                  onError={(e) => {
+                    console.error('Logo failed to load in PublicKiosk:', getUploadUrl(kioskStatus.logo!));
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              )}
+              
+              {/* Government Office Name */}
               <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-                  {kioskStatus?.title || 'Queue Management System'}
+                <h1 className="text-xl sm:text-2xl font-bold text-white">
+                  {kioskStatus?.governmentOfficeName || 'Government Office'}
                 </h1>
                 {kioskStatus && (
                   <div className="flex items-center mt-1 sm:mt-2">
                     {kioskStatus.status === 'open' ? (
-                      <div className="flex items-center text-green-600">
+                      <div className="flex items-center text-green-300">
                         <CheckCircleIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
                         <span className="text-xs sm:text-sm font-medium">Open</span>
                       </div>
                     ) : kioskStatus.status === 'standby' ? (
-                      <div className="flex items-center text-yellow-600">
+                      <div className="flex items-center text-yellow-300">
                         <ClockIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
                         <span className="text-xs sm:text-sm font-medium">Standby</span>
                       </div>
                     ) : (
-                      <div className="flex items-center text-red-600">
+                      <div className="flex items-center text-red-300">
                         <XMarkIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
                         <span className="text-xs sm:text-sm font-medium">Closed</span>
                       </div>
@@ -275,38 +330,57 @@ const PublicKiosk: React.FC = () => {
               </div>
             </div>
 
-            {/* Quick Actions Dropdown */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
-              <button
-                onClick={() => {
-                  console.log('View Queue Display button clicked, navigating to /display');
-                  navigate('/display');
-                }}
-                className="flex items-center justify-center px-3 py-2 sm:px-4 sm:py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-all duration-200 text-sm"
-              >
-                <EyeIcon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 mr-2" />
-                <span>View Display</span>
-              </button>
-              <button
-                onClick={() => {
-                  console.log('Admin Login button clicked, navigating to /admin/login');
-                  navigate('/admin/login');
-                }}
-                className="flex items-center justify-center px-3 py-2 sm:px-4 sm:py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-all duration-200 text-sm"
-              >
-                <CogIcon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 mr-2" />
-                <span>Admin Login</span>
-              </button>
-              <button
-                onClick={() => {
-                  console.log('Window Login button clicked, navigating to /window/login');
-                  navigate('/window/login');
-                }}
-                className="flex items-center justify-center px-3 py-2 sm:px-4 sm:py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-all duration-200 text-sm"
-              >
-                <UserGroupIcon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 mr-2" />
-                <span>Window Login</span>
-              </button>
+            <div className="flex items-center space-x-4">
+              {/* Date and Time */}
+              <div className="flex items-center space-x-2 text-white">
+                <ClockIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                <div className="text-right">
+                  <div className="text-sm sm:text-base font-bold">
+                    {currentTime.toLocaleTimeString()}
+                  </div>
+                  <div className="text-xs text-blue-100">
+                    {currentTime.toLocaleDateString('en-US', {
+                      weekday: 'short', year: 'numeric', month: 'short', day: 'numeric'
+                    })}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Actions Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  className="flex items-center px-3 py-2 sm:px-4 sm:py-2 bg-blue-700 hover:bg-blue-600 text-white rounded-lg transition-all duration-200 text-sm"
+                >
+                  <CogIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <ChevronDownIcon className="w-4 h-4 sm:w-5 sm:h-5 ml-2" />
+                </button>
+                {isDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden">
+                    <button
+                      onClick={() => { setIsDropdownOpen(false); navigate('/display'); }}
+                      className="w-full text-left px-3 py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                    >
+                      <EyeIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-gray-500" />
+                      View Display
+                    </button>
+                    <button
+                      onClick={() => { setIsDropdownOpen(false); navigate('/admin/login'); }}
+                      className="w-full text-left px-3 py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                    >
+                      <CogIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-gray-500" />
+                      Admin Login
+                    </button>
+                    <button
+                      onClick={() => { setIsDropdownOpen(false); navigate('/window/login'); }}
+                      className="w-full text-left px-3 py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                    >
+                      <UserGroupIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-gray-500" />
+                      Window Login
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -315,7 +389,7 @@ const PublicKiosk: React.FC = () => {
       {/* Kiosk Status Message */}
       {kioskStatus && !kioskStatus.isOpen && (
         <div className="max-w-4xl mx-auto px-4 py-12">
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-8 text-center">
+          <div className="bg-white rounded-2xl shadow-xl border-2 border-gray-300 p-8 text-center">
             <div className={`${kioskStatus.status === 'standby' ? 'bg-yellow-50 border-yellow-200' : 'bg-red-50 border-red-200'} border rounded-xl p-6 mb-6`}>
               {kioskStatus.status === 'standby' ? (
                 <>
@@ -342,7 +416,7 @@ const PublicKiosk: React.FC = () => {
             
             {/* Transaction Selection */}
             <div className="lg:col-span-2">
-              <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-4 sm:p-6">
+              <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-300 p-4 sm:p-6">
                 <div className="flex items-center mb-4 sm:mb-6">
                   <div className="bg-blue-100 p-2 sm:p-3 rounded-xl">
                     <TicketIcon className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
@@ -354,24 +428,24 @@ const PublicKiosk: React.FC = () => {
                   {transactionFlows.map((transaction) => (
                     <button
                       key={transaction._id}
-                      onClick={() => setSelectedTransaction(transaction.name)}
+                      onClick={() => setSelectedTransaction(selectedTransaction === transaction.name ? '' : transaction.name)}
                       className={`group relative p-4 sm:p-6 rounded-xl border-2 transition-all duration-300 transform hover:scale-105 ${
                         selectedTransaction === transaction.name
                           ? 'border-blue-500 bg-blue-50 shadow-xl ring-2 ring-blue-500 ring-opacity-50'
-                          : 'border-gray-200 hover:border-gray-300 hover:shadow-lg'
+                          : 'border-gray-300 hover:border-gray-400 hover:shadow-lg'
                       }`}
                     >
                       <div className="text-center">
-                        <div className={`text-3xl sm:text-4xl font-bold mb-2 transition-colors duration-300 ${
-                          selectedTransaction === transaction.name ? 'text-blue-600' : 'text-gray-700'
+                        <div className={`text-4xl sm:text-5xl lg:text-6xl font-black mb-3 transition-colors duration-300 ${
+                          selectedTransaction === transaction.name ? 'text-blue-600' : 'text-gray-800'
                         }`}>
                           {transaction.prefix}
                         </div>
-                        <h3 className={`text-base sm:text-lg font-semibold transition-colors duration-300 ${
+                        <h3 className={`text-lg sm:text-xl font-bold transition-colors duration-300 mb-2 ${
                           selectedTransaction === transaction.name ? 'text-blue-600' : 'text-gray-900'
                         }`}>{transaction.name}</h3>
                         {transaction.description && (
-                          <p className="text-xs sm:text-sm text-gray-600 mt-2">{transaction.description}</p>
+                          <p className="text-sm text-gray-600 leading-relaxed">{transaction.description}</p>
                         )}
                       </div>
                     </button>
@@ -382,7 +456,7 @@ const PublicKiosk: React.FC = () => {
 
             {/* Person Type Selection */}
             <div>
-              <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-4 sm:p-6">
+              <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-300 p-4 sm:p-6">
                 <div className="flex items-center mb-4 sm:mb-6">
                   <div className="bg-green-100 p-2 sm:p-3 rounded-xl">
                     <UserGroupIcon className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" />
@@ -394,11 +468,11 @@ const PublicKiosk: React.FC = () => {
                   {personTypes.map((type) => (
                     <button
                       key={type._id}
-                      onClick={() => setSelectedPersonType(type.name)}
+                      onClick={() => setSelectedPersonType(selectedPersonType === type.name ? '' : type.name)}
                       className={`group relative p-3 sm:p-4 rounded-xl border-2 transition-all duration-300 transform hover:scale-105 ${
                         selectedPersonType === type.name
                           ? 'border-blue-500 bg-blue-50 shadow-xl ring-2 ring-blue-500 ring-opacity-50'
-                          : 'border-gray-200 hover:border-gray-300 hover:shadow-lg'
+                          : 'border-gray-300 hover:border-gray-400 hover:shadow-lg'
                       }`}
                       style={{
                         borderColor: selectedPersonType === type.name ? type.color : undefined,
@@ -406,22 +480,12 @@ const PublicKiosk: React.FC = () => {
                       }}
                     >
                       <div 
-                        className="w-5 h-5 sm:w-6 sm:h-6 mx-auto mb-2 rounded-full border-2 border-gray-300"
+                        className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-3 rounded-full border-2 border-gray-300"
                         style={{ backgroundColor: type.color }}
                       />
-                      <div className={`text-xs sm:text-sm font-medium text-center transition-colors duration-300 ${
+                      <div className={`text-sm sm:text-base font-bold text-center transition-colors duration-300 ${
                         selectedPersonType === type.name ? 'text-blue-700' : 'text-gray-900'
                       }`}>{type.name}</div>
-                      {type.description && (
-                        <div className="text-xs text-gray-500 text-center mt-1 hidden sm:block">{type.description}</div>
-                      )}
-                      {type.priority && (
-                        <div className={`text-xs text-center mt-1 font-medium ${
-                          type.priority === 'High' ? 'text-red-600' : 'text-blue-600'
-                        }`}>
-                          {type.priority}
-                        </div>
-                      )}
                     </button>
                   ))}
                 </div>
@@ -430,7 +494,7 @@ const PublicKiosk: React.FC = () => {
 
             {/* Generate Queue Button */}
             <div className="lg:col-span-3">
-              <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-4 sm:p-6">
+              <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-300 p-4 sm:p-6">
                 <button
                   onClick={handleGenerateQueue}
                   disabled={!selectedTransaction || isGenerating}
@@ -509,8 +573,9 @@ const PublicKiosk: React.FC = () => {
       )}
       
       {/* Footer */}
-      <div className="text-center py-4 text-gray-500 text-sm">
-        Developed by: Servando S. Tio III
+      <div className="text-center py-4 text-gray-700 text-sm font-medium bg-gray-100 border-t border-gray-200">
+        All Rights Reserved 2026 Queue Management System<br/>
+        Developer: Servando Tio III
       </div>
     </div>
   );

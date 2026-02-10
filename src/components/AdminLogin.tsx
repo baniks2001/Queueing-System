@@ -40,8 +40,12 @@ const AdminLogin: React.FC = () => {
       const isSuperAdmin = username.toLowerCase() === SUPERADMIN_USERNAME.toLowerCase() && password === SUPERADMIN_PASSWORD;
       await login(username, password, isSuperAdmin);
       navigate('/admin/dashboard');
-    } catch (error: any) {
-      setError(error.response?.data?.message || 'Login failed. Please try again.');
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError('Login failed. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }

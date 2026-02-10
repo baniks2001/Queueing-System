@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useQueue } from '../contexts/QueueContext';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { getApiUrl } from '../config/api';
+import { getApiUrl, getUploadUrl } from '../config/api';
 import { io } from 'socket.io-client';
 import {
   ArrowLeftIcon,
@@ -18,12 +18,44 @@ const PublicDisplay: React.FC = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [kioskTitle, setKioskTitle] = useState('Queue Management System');
+  const [governmentOfficeName, setGovernmentOfficeName] = useState('Government Office');
+  const [logo, setLogo] = useState<string | null>(null);
   const [announcedQueues, setAnnouncedQueues] = useState<Set<string>>(new Set());
   const [repeatAnnouncementTracker, setRepeatAnnouncementTracker] = useState<Set<string>>(new Set());
   const [windowUsers, setWindowUsers] = useState<any[]>([]);
+  const [onHoldQueues, setOnHoldQueues] = useState<any[]>([]);
   const navigate = useNavigate();
 
   // Fetch window users from database
+  const fetchOnHoldQueues = async () => {
+    console.log('🚀 fetchOnHoldQueues called in PublicDisplay');
+    try {
+      console.log('🔍 Fetching all on-hold queues for PublicDisplay');
+      
+      const response = await fetch(getApiUrl('/api/queue/on-hold/all'), {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('📡 Response status:', response.status);
+      console.log('📡 Response ok:', response.ok);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ On-hold queues response for PublicDisplay:', data);
+        console.log(`📊 On-hold queues length: ${data.length}`);
+        setOnHoldQueues(data);
+      } else {
+        console.error(`❌ On-hold queues failed for PublicDisplay with status:`, response.status);
+        setOnHoldQueues([]);
+      }
+    } catch (error) {
+      console.error(`💥 Error fetching on-hold queues for PublicDisplay:`, error);
+      setOnHoldQueues([]);
+    }
+  };
+
   const fetchWindowUsers = async () => {
     try {
       const response = await axios.get(getApiUrl('/api/users/window-users/public'));
@@ -175,11 +207,19 @@ const PublicDisplay: React.FC = () => {
   useEffect(() => {
     fetchKioskTitle();
     fetchWindowUsers();
+    fetchOnHoldQueues();
     const interval = setInterval(() => {
       fetchKioskTitle();
       fetchWindowUsers();
+      fetchOnHoldQueues();
     }, 30000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Test immediate call
+  useEffect(() => {
+    console.log('🧪 Testing immediate fetchOnHoldQueues call');
+    fetchOnHoldQueues();
   }, []);
 
   // Socket.io connection for real-time updates
@@ -295,6 +335,8 @@ const PublicDisplay: React.FC = () => {
       const response = await axios.get(getApiUrl('/api/kiosk/status'));
       if (response.data) {
         setKioskTitle(response.data.title || 'Queue Management System');
+        setGovernmentOfficeName(response.data.governmentOfficeName || 'Government Office');
+        setLogo(response.data.logo || null);
       }
     } catch (error) {
       console.error('Error fetching kiosk title:', error);
@@ -374,9 +416,28 @@ const PublicDisplay: React.FC = () => {
         <div className="container mx-auto max-w-7xl px-2 sm:px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-white">
-                {kioskTitle}
-              </h1>
+              {/* Logo */}
+              {logo && (
+                <img 
+                  src={getUploadUrl(logo)} 
+                  alt="Government Office Logo" 
+                  className="h-10 w-10 sm:h-12 sm:w-12 lg:h-14 lg:w-14 object-contain"
+                  onError={(e) => {
+                    console.error('Logo failed to load in PublicDisplay:', getUploadUrl(logo));
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              )}
+              
+              {/* Government Office Name and Title */}
+              <div>
+                <div className="text-sm sm:text-base lg:text-lg font-bold text-blue-100">
+                  {governmentOfficeName}
+                </div>
+                <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-white">
+                  {kioskTitle}
+                </h1>
+              </div>
             </div>
             
             <div className="flex items-center space-x-4">
@@ -428,22 +489,22 @@ const PublicDisplay: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="pt-4 sm:pt-6">
-        <div className="container mx-auto max-w-7xl px-2 sm:px-3 py-1 sm:py-2">
+      <div className="h-screen pt-16">
+        <div className="container mx-auto max-w-7xl px-2 sm:px-3 py-2 h-full">
           
           {/* Side-by-side layout */}
-          <div className="flex flex-col lg:flex-row gap-2 lg:gap-3">
+          <div className="flex flex-col lg:flex-row gap-2 lg:gap-3 justify-center items-start h-full">
             
             {/* Left Side - Window Status */}
-            <div className="flex-1 lg:max-w-6xl">
-              <div className="bg-white rounded-xl p-6 sm:p-8 lg:p-10 shadow-xl border border-gray-200">
+            <div className="flex-1">
+              <div className="bg-white rounded-xl p-4 sm:p-6 lg:p-8 shadow-xl border border-gray-200 h-full overflow-hidden">
                 <h3 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-4 sm:mb-6 flex items-center text-slate-800">
                   <UserGroupIcon className="w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10 mr-4 sm:mr-5 text-blue-600" />
                   Window Status
                 </h3>
                 
                 {/* Dynamic Window Status - Show windows from database */}
-                <div className="space-y-4 sm:space-y-6">
+                <div className="space-y-3 sm:space-y-4">
                   {(() => {
                     const activeWindows = windowUsers
                       .filter(user => user.isActive && user.windowNumber)
@@ -451,14 +512,13 @@ const PublicDisplay: React.FC = () => {
                     
                     // Auto-resize grid based on number of windows
                     const windowCount = activeWindows.length;
-                    let gridCols = 'grid-cols-2';
-                    if (windowCount <= 2) gridCols = 'grid-cols-1 sm:grid-cols-2';
-                    else if (windowCount <= 3) gridCols = 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
-                    else if (windowCount <= 4) gridCols = 'grid-cols-2 lg:grid-cols-4';
-                    else gridCols = 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5';
+                    let gridCols = 'grid-cols-1';
+                    if (windowCount === 2) gridCols = 'grid-cols-1 sm:grid-cols-2';
+                    else if (windowCount === 3) gridCols = 'grid-cols-1 sm:grid-cols-3';
+                    else if (windowCount >= 4) gridCols = 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4';
                     
                     return (
-                      <div className={`grid ${gridCols} gap-4 sm:gap-6 lg:gap-8`}>
+                      <div className={`grid ${gridCols} gap-3 sm:gap-4 lg:gap-6`}>
                         {activeWindows.map((windowUser) => {
                           const windowNumber = windowUser.windowNumber;
                           const currentQueue = currentQueues.find(q => q.currentWindow === windowNumber);
@@ -467,31 +527,30 @@ const PublicDisplay: React.FC = () => {
                           return (
                             <div
                               key={windowUser._id}
-                              className={`relative overflow-hidden rounded-xl p-6 sm:p-8 lg:p-10 transition-all duration-300 transform hover:scale-105 border-2 flex flex-col justify-center items-center min-h-[180px] sm:min-h-[200px] lg:min-h-[240px] ${
+                              className={`relative overflow-hidden rounded-lg p-4 sm:p-6 lg:p-8 transition-all duration-300 transform hover:scale-105 border-2 flex flex-col justify-center items-center min-h-[140px] sm:min-h-[160px] lg:min-h-[180px] ${
                                 isServing
                                   ? 'bg-blue-50 border-blue-500 shadow-lg'
                                   : 'bg-gray-50 border-gray-300'
                               }`}
                             >
                               {/* Window Number */}
-                              <div className="text-center mb-3 sm:mb-4">
-                                <div className={`text-lg sm:text-xl lg:text-2xl font-bold uppercase tracking-wide ${
+                              <div className="text-center mb-2 sm:mb-3">
+                                <div className={`text-sm sm:text-base lg:text-lg font-bold uppercase tracking-wide ${
                                   isServing ? 'text-blue-600' : 'text-gray-600'
                                 }`}>
                                   Window {windowNumber}
                                 </div>
                               </div>
                               
-                              {/* Queue Number - Large and Visible */}
+                              {/* Queue Number */}
                               <div className="text-center flex-1 flex items-center justify-center">
                                 {isServing ? (
                                   <div className="font-black text-blue-600"
                                     style={{
-                                      fontSize: windowCount <= 3 ? 'clamp(3rem, 6vw, 4.5rem)' : 'clamp(2.5rem, 5vw, 4rem)',
+                                      fontSize: 'clamp(1.8rem, 4vw, 3rem)',
                                       letterSpacing: '0.01em',
                                       lineHeight: '1',
-                                      fontWeight: '900',
-                                      textShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                                      fontWeight: '900'
                                     }}
                                   >
                                     {currentQueue.queueNumber}
@@ -499,7 +558,7 @@ const PublicDisplay: React.FC = () => {
                                 ) : (
                                   <div className="font-bold text-gray-700"
                                     style={{
-                                      fontSize: windowCount <= 3 ? 'clamp(2.5rem, 5vw, 3.5rem)' : 'clamp(2rem, 4vw, 3rem)',
+                                      fontSize: 'clamp(1.5rem, 3.5vw, 2.5rem)',
                                       letterSpacing: '0.01em',
                                       lineHeight: '1'
                                     }}
@@ -510,8 +569,8 @@ const PublicDisplay: React.FC = () => {
                               </div>
                               
                               {/* Status */}
-                              <div className="text-center mt-3 sm:mb-4">
-                                <div className={`text-lg sm:text-xl lg:text-2xl font-bold ${
+                              <div className="text-center mt-2 sm:mt-3">
+                                <div className={`text-sm sm:text-base lg:text-lg font-bold ${
                                   isServing ? 'text-blue-500' : 'text-gray-500'
                                 }`}>
                                   {isServing ? 'Now Serving' : 'Available'}
@@ -520,7 +579,7 @@ const PublicDisplay: React.FC = () => {
                               
                               {/* Border Indicator for Active Windows */}
                               {isServing && (
-                                <div className="absolute top-0 left-0 right-0 h-4 bg-blue-500 rounded-t-xl" />
+                                <div className="absolute top-0 left-0 right-0 h-3 bg-blue-500 rounded-t-lg" />
                               )}
                             </div>
                           );
@@ -533,11 +592,11 @@ const PublicDisplay: React.FC = () => {
             </div>
             
             {/* Right Side - Current Queue Numbers */}
-            <div className="flex-1 lg:max-w-xs">
-              <div className="bg-white rounded-xl p-1 sm:p-2 lg:p-2 shadow-md border border-gray-200">
+            <div className="flex-1 lg:max-w-sm">
+              <div className="bg-white rounded-xl p-2 sm:p-3 lg:p-4 shadow-md border border-gray-200 h-full overflow-hidden flex flex-col">
                 
                 {/* Responsive Queue List */}
-                <div className="space-y-1">
+                <div className="space-y-1 flex-1 overflow-y-auto">
                   {/* Table Header */}
                   <div className="bg-gradient-to-r from-slate-700 to-slate-800 rounded-sm p-1 sm:p-1 flex flex-col sm:flex-row sm:items-center sm:justify-between border border-slate-600 shadow-sm">
                     {/* Left Section Headers */}
@@ -579,7 +638,7 @@ const PublicDisplay: React.FC = () => {
                   
                   {/* Queue Items */}
                   {(() => {
-                    const queues = getAllQueuesByPosition().slice(0, 10);
+                    const queues = getAllQueuesByPosition().slice(0, 5);
                     console.log('🔍 Debug - Queues to render:', queues);
                     console.log('🔍 Debug - Queues length:', queues.length);
                     
@@ -698,20 +757,142 @@ const PublicDisplay: React.FC = () => {
                   </h4>
                 </div>
                 
-                {getAllQueuesByPosition().length > 6 && (
+                {getAllQueuesByPosition().length > 5 && (
                   <div className="text-center mt-1 text-slate-500 text-xs font-medium bg-gray-50 rounded-sm py-1 px-1 border border-gray-200">
-                    And {getAllQueuesByPosition().length - 6} more waiting...
+                    And {getAllQueuesByPosition().length - 5} more waiting...
+                  </div>
+                )}
+              </div>
+              
+              {/* On Hold Queue Numbers */}
+              <div className="bg-white rounded-xl p-2 sm:p-3 lg:p-4 shadow-md border border-gray-200 h-full overflow-hidden flex flex-col mt-2">
+                {/* On Hold Queue List */}
+                <div className="space-y-1 flex-1 overflow-y-auto">
+                  {/* Table Header */}
+                  <div className="bg-gradient-to-r from-orange-700 to-orange-800 rounded-sm p-1 sm:p-1 flex flex-col sm:flex-row sm:items-center sm:justify-between border border-orange-600 shadow-sm">
+                    {/* Left Section Headers */}
+                    <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-1 lg:space-x-1">
+                      {/* Window Header */}
+                      <div className="text-center sm:text-left min-w-[15px] sm:min-w-[20px] lg:min-w-[25px]">
+                        <div className="text-xs text-orange-300 font-bold uppercase tracking-wide">Window</div>
+                      </div>
+                      
+                      {/* Queue Number Header */}
+                      <div className="text-center sm:text-left min-w-[25px] sm:min-w-[30px] lg:min-w-[35px]">
+                        <div className="text-xs text-orange-300 font-bold uppercase tracking-wide">Queue #</div>
+                      </div>
+                      
+                      {/* Service Header */}
+                      <div className="text-center sm:text-left min-w-[30px] sm:min-w-[35px] lg:min-w-[40px] flex-1">
+                        <div className="text-xs text-orange-300 font-bold uppercase tracking-wide">Service</div>
+                      </div>
+                      
+                      {/* Person Type Header - Hidden on mobile */}
+                      <div className="hidden sm:block text-center sm:text-left min-w-[20px] sm:min-w-[25px] lg:min-w-[30px]">
+                        <div className="text-xs text-orange-300 font-bold uppercase tracking-wide">Type</div>
+                      </div>
+                    </div>
+                    
+                    {/* Right Section Headers */}
+                    <div className="flex flex-row sm:flex-row items-center justify-end space-x-1 sm:space-x-1 lg:space-x-2 mt-1 sm:mt-0">
+                      {/* Hold Time Header */}
+                      <div className="text-center">
+                        <div className="text-xs text-orange-300 font-bold uppercase tracking-wide">Hold</div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* On Hold Queue Items */}
+                  {(() => {
+                    const displayOnHoldQueues = onHoldQueues.slice(0, 5);
+                    console.log('🔍 Debug - On Hold Queues to render:', displayOnHoldQueues);
+                    console.log('🔍 Debug - On Hold Queues length:', displayOnHoldQueues.length);
+                    
+                    if (displayOnHoldQueues.length === 0) {
+                      return (
+                        <div className="text-center py-2 text-slate-500">
+                          <div className="text-xs font-medium">No on-hold queues</div>
+                          <div className="text-xs mt-1">All queues are being served or waiting</div>
+                        </div>
+                      );
+                    }
+                    
+                    return displayOnHoldQueues.map((queue) => {
+                      // Calculate hold time
+                      const holdTime = new Date(queue.updatedAt).getTime();
+                      const currentTimeMs = new Date().getTime();
+                      const holdDuration = Math.floor((currentTimeMs - holdTime) / 60000); // minutes
+                      
+                      return (
+                        <div key={queue._id} className="bg-orange-50 rounded-sm p-1 sm:p-1 flex flex-col sm:flex-row sm:items-center sm:justify-between hover:bg-orange-100 transition-all duration-300 border border-orange-200 shadow-sm hover:shadow-md">
+                          {/* Left Section - Queue Info */}
+                          <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-1 lg:space-x-1 border-r border-orange-200 pr-1 sm:pr-1">
+                            {/* Window Number */}
+                            <div className="text-center sm:text-left min-w-[15px] sm:min-w-[20px] lg:min-w-[25px]">
+                              <div className="text-xs text-gray-500 font-medium uppercase tracking-wide">Window</div>
+                              <div className="text-xs sm:text-xs lg:text-sm font-bold text-slate-800">
+                                {queue.currentWindow || 'Wait'}
+                              </div>
+                            </div>
+                            
+                            {/* Queue Number */}
+                            <div className="text-center sm:text-left min-w-[25px] sm:min-w-[30px] lg:min-w-[35px]">
+                              <div className="text-xs text-gray-500 font-medium uppercase tracking-wide">Queue #</div>
+                              <div className="text-xs sm:text-xs lg:text-sm font-bold text-orange-600">
+                                {queue.queueNumber}
+                              </div>
+                            </div>
+                            
+                            {/* Service */}
+                            <div className="text-center sm:text-left min-w-[30px] sm:min-w-[35px] lg:min-w-[40px] flex-1">
+                              <div className="text-xs text-gray-500 font-medium uppercase tracking-wide">Service</div>
+                              <div className="text-xs sm:text-xs lg:text-sm font-semibold text-slate-700 truncate">
+                                {queue.service || 'General'}
+                              </div>
+                            </div>
+                            
+                            {/* Person Type - Hidden on mobile */}
+                            <div className="hidden sm:block text-center sm:text-left min-w-[20px] sm:min-w-[25px] lg:min-w-[30px]">
+                              <div className="text-xs text-gray-500 font-medium uppercase tracking-wide">Type</div>
+                              <div className="text-xs sm:text-xs lg:text-sm font-medium text-slate-600">
+                                {queue.personType}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Right Section - Hold Time */}
+                          <div className="flex flex-row sm:flex-row items-center justify-end space-x-1 sm:space-x-1 lg:space-x-2 mt-1 sm:mt-0">
+                            {/* Hold Duration */}
+                            <div className="text-center">
+                              <div className="text-xs text-gray-500 font-medium uppercase tracking-wide">Hold</div>
+                              <div className="text-xs sm:text-xs lg:text-sm font-bold text-orange-600">
+                                {holdDuration}m
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+                
+                {/* Label Below Table */}
+                <div className="text-center mt-2 text-slate-600">
+                  <h4 className="text-xs sm:text-sm lg:text-sm font-bold uppercase tracking-wide">
+                    <UserGroupIcon className="w-3 h-3 sm:w-4 sm:h-4 lg:w-5 lg:h-5 mr-1 text-orange-600" />
+                    On Hold Queue Numbers
+                  </h4>
+                </div>
+                
+                {onHoldQueues.length > 5 && (
+                  <div className="text-center mt-1 text-slate-500 text-xs font-medium bg-orange-50 rounded-sm py-1 px-1 border border-orange-200">
+                    And {onHoldQueues.length - 5} more on hold...
                   </div>
                 )}
               </div>
             </div>
           </div>
         </div>
-      </div>
-      
-      {/* Footer */}
-      <div className="text-center py-4 text-blue-200 text-sm">
-        Developed by: Servando S. Tio III
       </div>
     </div>
   );

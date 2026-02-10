@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { getApiUrl } from '../config/api';
+import { useToast } from '../contexts/ToastContext';
+import ConfirmationModal from './ConfirmationModal';
 import { PencilIcon, TrashIcon, PlusIcon, KeyIcon, CheckIcon, NoSymbolIcon } from '@heroicons/react/24/outline';
 
 interface User {
@@ -25,15 +27,14 @@ const UserManagement: React.FC = () => {
     service: 'Cashier'
   });
   const [newPassword, setNewPassword] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const { showSuccess, showError } = useToast();
 
   const services = ['Cashier', 'Information', 'Documentation', 'Technical Support', 'Customer Service'];
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setIsLoading(true);
     try {
       const token = localStorage.getItem('token');
@@ -59,11 +60,15 @@ const UserManagement: React.FC = () => {
       setUsers(data);
     } catch (error) {
       console.error('Error fetching users:', error);
-      alert('Error fetching users. Please check console for details.');
+      showError('Fetch Failed', 'Error fetching users. Please check console for details.');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [showError]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,13 +110,15 @@ const UserManagement: React.FC = () => {
           windowNumber: 1,
           service: 'Cashier'
         });
+        const action = editingUser ? 'updated' : 'created';
+        showSuccess('User Saved', `User account has been ${action} successfully.`);
       } else {
         const error = await response.json();
-        alert(error.message || 'Failed to save user');
+        showError('Save Failed', error.message || 'Failed to save user');
       }
     } catch (error) {
       console.error('Error saving user:', error);
-      alert('Error saving user. Please try again.');
+      showError('Save Failed', 'Error saving user. Please try again.');
     }
   };
 
@@ -146,14 +153,14 @@ const UserManagement: React.FC = () => {
         setIsPasswordModalOpen(false);
         setPasswordUser(null);
         setNewPassword('');
-        alert('Password updated successfully');
+        showSuccess('Password Updated', 'Password has been updated successfully.');
       } else {
         const error = await response.json();
-        alert(error.message || 'Failed to update password');
+        showError('Update Failed', error.message || 'Failed to update password');
       }
     } catch (error) {
       console.error('Error updating password:', error);
-      alert('Error updating password. Please try again.');
+      showError('Update Failed', 'Error updating password. Please try again.');
     }
   };
 
@@ -171,13 +178,15 @@ const UserManagement: React.FC = () => {
 
       if (response.ok) {
         await fetchUsers();
+        const action = isActive ? 'activated' : 'deactivated';
+        showSuccess('Status Updated', `User account has been ${action} successfully.`);
       } else {
         const error = await response.json();
-        alert(error.message || 'Failed to update user status');
+        showError('Status Update Failed', error.message || 'Failed to update user status');
       }
     } catch (error) {
       console.error('Error updating user status:', error);
-      alert('Error updating user status. Please try again.');
+      showError('Status Update Failed', 'Error updating user status. Please try again.');
     }
   };
 
@@ -188,11 +197,17 @@ const UserManagement: React.FC = () => {
   };
 
   const handleDelete = async (userId: string) => {
-    if (!confirm('Are you sure you want to delete this user?')) return;
+    setSelectedUserId(userId);
+    setShowDeleteModal(true);
+  };
 
+  const confirmDelete = async () => {
+    setShowDeleteModal(false);
+    if (!selectedUserId) return;
+    
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(getApiUrl(`/api/users/window-user/${userId}`), {
+      const response = await fetch(getApiUrl(`/api/users/window-user/${selectedUserId}`), {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`
@@ -201,10 +216,11 @@ const UserManagement: React.FC = () => {
 
       if (response.ok) {
         await fetchUsers();
+        showSuccess('User Deleted', 'User account has been deleted successfully.');
       }
     } catch (error) {
       console.error('Error deleting user:', error);
-      alert('Error deleting user. Please try again.');
+      showError('Deletion Failed', 'Error deleting user. Please try again.');
     }
   };
 
@@ -460,6 +476,18 @@ const UserManagement: React.FC = () => {
           </div>
         </div>
       )}
+      
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={confirmDelete}
+        title="Delete User Account"
+        message="Are you sure you want to delete this user account? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        type="danger"
+      />
     </div>
   );
 };

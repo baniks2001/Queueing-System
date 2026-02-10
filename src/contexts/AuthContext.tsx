@@ -44,47 +44,41 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const savedUser = localStorage.getItem('user');
     
     if (savedToken && savedUser) {
-      try {
-        const parsedUser = JSON.parse(savedUser);
-        console.log('AuthContext - Loaded user from localStorage:', parsedUser);
+      const parsedUser = JSON.parse(savedUser);
+      console.log('AuthContext - Loaded user from localStorage:', parsedUser);
+      
+      // Use setTimeout to avoid synchronous setState
+      setTimeout(() => {
         setToken(savedToken);
         setUser(parsedUser);
-      } catch (error) {
-        console.error('AuthContext - Error parsing user data:', error);
-        localStorage.removeItem('user');
-        localStorage.removeItem('token');
-      }
+      }, 0);
     }
     setIsLoading(false);
   }, []);
 
   const login = async (username: string, password: string, isSuperAdmin: boolean = false) => {
-    try {
-      // Clear any existing auth data first
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      setUser(null);
-      setToken(null);
-      delete axios.defaults.headers.common['Authorization'];
-      
-      const endpoint = isSuperAdmin ? '/api/auth/super-admin-login' : '/api/auth/login';
-      const response = await axios.post(getApiUrl(endpoint), {
-        username,
-        password
-      });
+    // Clear any existing auth data first
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setUser(null);
+    setToken(null);
+    delete axios.defaults.headers.common['Authorization'];
+    
+    const endpoint = isSuperAdmin ? '/api/auth/super-admin-login' : '/api/auth/login';
+    const response = await axios.post(getApiUrl(endpoint), {
+      username,
+      password
+    });
 
-      const { token: newToken, user: userData } = response.data;
-      
-      setToken(newToken);
-      setUser(userData);
-      
-      localStorage.setItem('token', newToken);
-      localStorage.setItem('user', JSON.stringify(userData));
-      
-      axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-    } catch (error) {
-      throw error;
-    }
+    const { token: newToken, user: userData } = response.data;
+    
+    setToken(newToken);
+    setUser(userData);
+    
+    localStorage.setItem('token', newToken);
+    localStorage.setItem('user', JSON.stringify(userData));
+    
+    axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
   };
 
   const logout = () => {

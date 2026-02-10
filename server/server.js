@@ -1,18 +1,17 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const dotenv = require('dotenv');
+// Load path module before dotenv
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
+
+// Load environment variables from unified .env
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+
+const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
-const os = require('os');
-const fs = require('fs');
-
-// Load environment variables from the correct .env file
-const envPath = path.join(__dirname, '.env');
-dotenv.config({ path: envPath });
+const cors = require('cors');
+const helmet = require('helmet');
+const mongoose = require('mongoose');
 
 // DEBUG: Verify critical environment variables are loaded
 console.log('🔧 Environment Verification after dotenv.config():');
@@ -23,52 +22,70 @@ console.log('🔐 SUPER_ADMIN_PASSWORD:', process.env.SUPER_ADMIN_PASSWORD);
 
 // Auto-detect network IP and update environment variables
 function detectAndUpdateNetworkIP() {
-    const networkInterfaces = os.networkInterfaces();
-    let primaryIP = 'localhost';
-    let wifiIP = null;
-    let ethernetIP = null;
-
-    // Find network IPs
-    Object.keys(networkInterfaces).forEach(interfaceName => {
+    let networkIP = 'localhost'; // Declare networkIP outside try block
+    try {
+      const networkInterfaces = os.networkInterfaces();
+      let primaryIP = 'localhost';
+      let wifiIP = null;
+      let ethernetIP = null;
+      
+      // Find network IPs
+      Object.keys(networkInterfaces).forEach(interfaceName => {
         networkInterfaces[interfaceName].forEach(iface => {
-            if (iface.family === 'IPv4' && !iface.internal) {
-                if (interfaceName.toLowerCase().includes('wi-fi') || interfaceName.toLowerCase().includes('wlan')) {
-                    wifiIP = iface.address;
-                } else if (interfaceName.toLowerCase().includes('ethernet') || interfaceName.toLowerCase().includes('eth')) {
-                    ethernetIP = iface.address;
-                }
-                primaryIP = iface.address;
+          if (iface.family === 'IPv4' && !iface.internal) {
+            // More flexible WiFi detection for different systems
+            if ((interfaceName.toLowerCase().includes('wi-fi') || interfaceName.toLowerCase().includes('wlan')) ||
+                (interfaceName.toLowerCase().includes('wireless') || interfaceName.toLowerCase().includes('wifi'))) {
+              wifiIP = iface.address;
+            } else if (interfaceName.toLowerCase().includes('ethernet') || interfaceName.toLowerCase().includes('eth')) {
+              ethernetIP = iface.address;
             }
+            primaryIP = iface.address;
+          }
         });
-    });
-
-    // Prefer WiFi over Ethernet for mobile access
-    const networkIP = wifiIP || ethernetIP || primaryIP;
-    
-    console.log(`🌐 Network Detection Results:`);
-    console.log(`   WiFi IP: ${wifiIP || 'Not found'}`);
-    console.log(`   Ethernet IP: ${ethernetIP || 'Not found'}`);
-    console.log(`   Primary IP: ${primaryIP}`);
-    console.log(`   Selected IP: ${networkIP}`);
-
-    // Update environment variables dynamically
-    process.env.DETECTED_IP = networkIP;
-    process.env.VITE_API_URL = `http://${networkIP}:5000`;
-    process.env.VITE_FRONTEND_HOST = networkIP;
-    process.env.VITE_BACKEND_HOST = networkIP;
-
-    // Update CORS origins with detected IP
-    const allowedOrigins = [
+      });
+      
+      // Prefer WiFi over Ethernet for mobile access (better for mobile devices)
+      networkIP = wifiIP || ethernetIP || primaryIP;
+      
+      console.log(`🌐 Network Detection Results:`);
+      console.log(`   WiFi IP: ${wifiIP || 'Not found'}`);
+      console.log(`   Ethernet IP: ${ethernetIP || 'Not found'}`);
+      console.log(`   Primary IP: ${primaryIP}`);
+      console.log(`   Selected IP: ${networkIP}`);
+      
+      // Update environment variables dynamically
+      process.env.DETECTED_IP = networkIP;
+      process.env.BACKEND_HOST = networkIP;
+      process.env.BACKEND_PORT = 5000;
+      process.env.VITE_FRONTEND_HOST = networkIP;
+      process.env.VITE_BACKEND_HOST = networkIP;
+      
+      // Update CORS origins with detected IP
+      const allowedOrigins = [
         `http://localhost:5174`,
         `http://${networkIP}:5174`,
         `http://localhost:3000`,
         `http://${networkIP}:3000`
-    ];
-    process.env.ALLOWED_ORIGINS = allowedOrigins.join(',');
-    process.env.CLIENT_URL = allowedOrigins.slice(0, 2).join(',');
-
-    // Update .env file with new IP
-    updateEnvFile(networkIP);
+      ];
+      
+      // Update ALLOWED_ORIGINS in environment
+      process.env.ALLOWED_ORIGINS = allowedOrigins.join(',');
+      process.env.CLIENT_URL = allowedOrigins.slice(0, 2).join(',');
+      
+      console.log(`📝 Updated .env file with IP: ${networkIP}`);
+      
+      // Update CSP in index.html
+      updateCSPInIndexHTML(networkIP);
+      
+    } catch (error) {
+      console.error('❌ Error detecting network IP:', error);
+      // Fallback to localhost
+      process.env.BACKEND_HOST = 'localhost';
+      process.env.VITE_FRONTEND_HOST = 'localhost';
+      process.env.VITE_BACKEND_HOST = 'localhost';
+      return 'localhost'; // Return 'localhost' here
+    }
 
     return networkIP;
 }
@@ -76,39 +93,69 @@ function detectAndUpdateNetworkIP() {
 // Update .env file with detected IP
 function updateEnvFile(networkIP) {
     try {
+        // Update server .env file
         const envPath = path.join(__dirname, '.env');
         let envContent = fs.readFileSync(envPath, 'utf8');
         
-        // Update IP-related variables
-        envContent = envContent.replace(/VITE_API_URL=.*/g, `VITE_API_URL=http://${networkIP}:5000`);
-        envContent = envContent.replace(/VITE_FRONTEND_HOST=.*/g, `VITE_FRONTEND_HOST=${networkIP}`);
-        envContent = envContent.replace(/VITE_BACKEND_HOST=.*/g, `VITE_BACKEND_HOST=${networkIP}`);
+        // Update IP-related variables in server .env
+        envContent = envContent.replace(/FRONTEND_HOST=.*/g, `FRONTEND_HOST=${networkIP}`);
+        envContent = envContent.replace(/BACKEND_HOST=.*/g, `BACKEND_HOST=${networkIP}`);
         
-        // Preserve existing superadmin credentials if they exist
-        if (!envContent.includes('SUPER_ADMIN_USERNAME=')) {
-            envContent += '\n# Super Admin Configuration\nSUPER_ADMIN_EMAIL=admin@queueing.com\nSUPER_ADMIN_PASSWORD=SuperAdmin123!';
-        }
-        if (!envContent.includes('JWT_SECRET=')) {
-            envContent += '\n# JWT Secret\nJWT_SECRET=queueing@2025system';
-        }
-        if (!envContent.includes('MONGODB_URI=')) {
-            envContent += '\n# Database Configuration (MongoDB Atlas)\nMONGODB_URI=mongodb+srv://servandoytio:qDn2Se8cKbWaPCeN@merncluster.2veth.mongodb.net/?appName=mernCluster';
-        }
-        
-        // Update CORS origins
+        // Update CORS origins in server .env
         const newOrigins = `http://localhost:5174,http://${networkIP}:5174,http://localhost:3000,http://${networkIP}:3000`;
         envContent = envContent.replace(/ALLOWED_ORIGINS=.*/g, `ALLOWED_ORIGINS=${newOrigins}`);
         envContent = envContent.replace(/CLIENT_URL=.*/g, `CLIENT_URL=http://localhost:5174,http://${networkIP}:5174`);
         
         fs.writeFileSync(envPath, envContent);
-        console.log(`📝 Updated .env file with IP: ${networkIP}`);
+        
+        // Also update root .env file for frontend
+        const rootEnvPath = path.join(__dirname, '..', '.env');
+        let rootEnvContent = '';
+        
+        try {
+            rootEnvContent = fs.readFileSync(rootEnvPath, 'utf8');
+        } catch (error) {
+            console.error('❌ Error reading root .env file:', error);
+            return;
+        }
+        
+        // Update IP-related variables in root .env
+        rootEnvContent = rootEnvContent.replace(/VITE_API_URL=.*/g, `VITE_API_URL=http://${networkIP}:5000`);
+        rootEnvContent = rootEnvContent.replace(/VITE_FRONTEND_HOST=.*/g, `VITE_FRONTEND_HOST=${networkIP}`);
+        rootEnvContent = rootEnvContent.replace(/VITE_BACKEND_HOST=.*/g, `VITE_BACKEND_HOST=${networkIP}`);
+        
+        fs.writeFileSync(rootEnvPath, rootEnvContent);
+        
+        console.log(`📝 Updated both .env files with IP: ${networkIP}`);
     } catch (error) {
-        console.error('❌ Failed to update .env file:', error.message);
+        console.error('❌ Failed to update .env files:', error.message);
+    }
+}
+
+// Update CSP in index.html with detected IP
+function updateCSPInIndexHTML(networkIP) {
+    try {
+        const indexPath = path.join(__dirname, '..', 'index.html');
+        let indexContent = fs.readFileSync(indexPath, 'utf8');
+        
+        // Update CSP connect-src with new IP
+        const cspPattern = /connect-src 'self' ws: wss: http:\/\/localhost:5000 http:\/\/[^:]+:5000;/;
+        const newCSP = `connect-src 'self' ws: wss: http://localhost:5000 http://${networkIP}:5000;`;
+        
+        indexContent = indexContent.replace(cspPattern, newCSP);
+        
+        fs.writeFileSync(indexPath, indexContent);
+        console.log(`📝 Updated CSP in index.html with IP: ${networkIP}`);
+    } catch (error) {
+        console.error('❌ Failed to update CSP in index.html:', error.message);
     }
 }
 
 // Detect network IP on startup
 const detectedIP = detectAndUpdateNetworkIP();
+
+// Update CSP in index.html with initial detected IP
+updateCSPInIndexHTML(detectedIP);
 
 // DEBUG: Verify critical environment variables
 console.log('🔧 Environment Verification:');
@@ -151,32 +198,20 @@ global.io = io;
 // Performance optimization: Disable x-powered-by
 app.disable('x-powered-by');
 
-// Security middleware with production-ready configurations
-app.use(helmet({
-    crossOriginResourcePolicy: { policy: "cross-origin" },
-    contentSecurityPolicy: {
-        directives: {
-            defaultSrc: ["'self'"],
-            styleSrc: ["'self'", "'unsafe-inline'"],
-            scriptSrc: ["'self'"],
-            imgSrc: ["'self'", "data:", "https:"],
-            connectSrc: ["'self'", "ws:", "wss:"],
-            fontSrc: ["'self'"],
-            objectSrc: ["'none'"],
-            mediaSrc: ["'self'"],
-            frameSrc: ["'none'"]
-        }
-    },
-    hsts: {
-        maxAge: 31536000,
-        includeSubDomains: true,
-        preload: true
-    },
-    noSniff: true,
-    frameguard: { action: 'deny' },
-    xssFilter: true,
-    referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
-}));
+// Completely disable helmet for now
+// app.use(helmet({
+//     crossOriginResourcePolicy: { policy: "cross-origin" },
+//     // Completely remove CSP
+//     hsts: {
+//       maxAge: 31536000,
+//       includeSubDomains: true,
+//       preload: true
+//     },
+//     noSniff: true,
+//     frameguard: { action: 'deny' },
+//     xssFilter: true,
+//     referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
+// }));
 
 // CORS with performance optimizations
 app.use(cors({
@@ -186,37 +221,14 @@ app.use(cors({
     maxAge: 3600
 }));
 
-// Enhanced rate limiting with security configurations
-const limiter = rateLimit({
-    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 1000, // Increased for better UX
-    message: {
-        error: 'Too many requests from this IP, please try again later.',
-        retryAfter: Math.ceil((parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000) / 1000)
-    },
-    standardHeaders: true,
-    legacyHeaders: false,
-    skip: (req) => {
-        // Skip rate limiting for health checks, queue endpoints, and socket.io
-        return req.path === '/api/health' || 
-               req.path === '/' || 
-               req.path.startsWith('/api/queue') ||
-               req.path.startsWith('/api/auth') ||
-               req.path.startsWith('/socket.io/') ||
-               req.path.startsWith('/api/kiosk');
-    },
-    keyGenerator: (req) => {
-        // Use IP address for rate limiting
-        return req.ip || req.connection.remoteAddress;
-    }
-});
-
-app.use(limiter);
-
 // Body parser with optimized settings for high load
 app.use(express.json({
     limit: '10mb', // Increased for handling larger requests
     verify: (req, res, buf) => {
+        // Skip JSON verification for multipart/form-data
+        if (req.headers['content-type'] && req.headers['content-type'].includes('multipart/form-data')) {
+            return;
+        }
         try {
             if (buf && buf.length > 0) {
                 JSON.parse(buf);
@@ -233,6 +245,27 @@ app.use(express.urlencoded({
     limit: '10mb', // Increased for high load
     parameterLimit: 100 // Increased for complex forms
 }));
+
+// Remove ALL CSP headers completely - aggressive approach
+app.use((req, res, next) => {
+    // Remove all possible CSP headers
+    res.removeHeader('Content-Security-Policy');
+    res.removeHeader('X-Content-Security-Policy');
+    res.removeHeader('X-WebKit-CSP');
+    res.removeHeader('X-Content-Security-Policy-Report-Only');
+    res.removeHeader('X-WebKit-CSP-Report-Only');
+    
+    // Override any CSP headers that might be set later
+    const originalSetHeader = res.setHeader;
+    res.setHeader = function(name, value) {
+        if (name.toLowerCase().includes('content-security-policy')) {
+            return res; // Block any CSP headers
+        }
+        return originalSetHeader.call(this, name, value);
+    };
+    
+    next();
+});
 
 // Request timeout and security middleware
 app.use((req, res, next) => {
@@ -260,7 +293,7 @@ app.use((req, res, next) => {
 });
 
 // Static files with caching
-app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
     maxAge: '1d', // Cache for 1 day
     etag: true,
     lastModified: true
@@ -300,6 +333,64 @@ app.use((err, req, res, next) => {
     });
 });
 
+// IP Synchronization Endpoint
+app.post('/api/sync-ip', (req, res) => {
+  try {
+    const { frontendHost, frontendPort } = req.body;
+    
+    if (!frontendHost || !frontendPort) {
+      return res.status(400).json({ error: 'Frontend host and port are required' });
+    }
+    
+    // Update server .env file with new frontend IP
+    const envPath = path.join(__dirname, '.env');
+    let envContent = '';
+    
+    try {
+      if (fs.existsSync(envPath)) {
+        envContent = fs.readFileSync(envPath, 'utf8');
+      }
+    } catch (error) {
+      console.error('Error reading .env file:', error);
+    }
+    
+    // Update or add frontend configuration
+    const lines = envContent.split('\n').filter(line => line.trim() !== '');
+    const updatedLines = lines.map(line => {
+      if (line.startsWith('FRONTEND_HOST=')) {
+        return `FRONTEND_HOST=${frontendHost}`;
+      } else if (line.startsWith('FRONTEND_PORT=')) {
+        return `FRONTEND_PORT=${frontendPort}`;
+      }
+      return line;
+    });
+    
+    // Add new lines if they don't exist
+    if (!lines.some(line => line.startsWith('FRONTEND_HOST='))) {
+      updatedLines.push(`FRONTEND_HOST=${frontendHost}`);
+    }
+    if (!lines.some(line => line.startsWith('FRONTEND_PORT='))) {
+      updatedLines.push(`FRONTEND_PORT=${frontendPort}`);
+    }
+    
+    // Write updated .env file
+    fs.writeFileSync(envPath, updatedLines.join('\n'));
+    
+    console.log(`🔄 Updated frontend configuration: ${frontendHost}:${frontendPort}`);
+    
+    res.json({ 
+      message: 'Frontend configuration updated successfully',
+      frontendHost,
+      frontendPort,
+      backendHost: process.env.BACKEND_HOST,
+      backendPort: process.env.BACKEND_PORT
+    });
+  } catch (error) {
+    console.error('Error syncing IP:', error);
+    res.status(500).json({ error: 'Failed to update configuration' });
+  }
+});
+
 // Enhanced health check with database status and performance metrics
 app.get('/api/health', async (req, res) => {
     try {
@@ -332,9 +423,7 @@ app.get('/api/health', async (req, res) => {
             server: {
                 workerId: process.pid,
                 environment: process.env.NODE_ENV || 'development',
-                serverPort: PORT,
-                maxRequests: process.env.RATE_LIMIT_MAX_REQUESTS || 1000,
-                rateLimitWindow: process.env.RATE_LIMIT_WINDOW_MS || 900000
+                serverPort: PORT
             }
         });
     } catch (error) {
@@ -360,8 +449,6 @@ app.get('/', (req, res) => {
             apiURL: process.env.VITE_API_URL
         },
         performance: {
-            maxRequests: process.env.RATE_LIMIT_MAX_REQUESTS || 1000,
-            rateLimitWindow: process.env.RATE_LIMIT_WINDOW_MS || 900000,
             clusterMode: true,
             workers: os.cpus().length
         },
@@ -500,10 +587,9 @@ const connectDB = async () => {
         await mongoose.connect(mongoURI, {
             serverSelectionTimeoutMS: 5000,
             socketTimeoutMS: 45000,
-            maxPoolSize: 10,
-            bufferCommands: false
+            maxPoolSize: 10
         });
-        
+
         console.log('✅ Connected to MongoDB');
         console.log('📊 Database name:', mongoose.connection.name);
         console.log('📊 Database host:', mongoose.connection.host);
@@ -601,7 +687,10 @@ setInterval(() => {
     const newIP = detectAndUpdateNetworkIP();
     if (newIP !== process.env.DETECTED_IP) {
         console.log(`🔄 Network IP changed from ${process.env.DETECTED_IP} to ${newIP}`);
-        console.log('📝 Environment variables updated. Restart server for full effect.');
+        console.log('📝 Environment variables and CSP updated. Restart frontend for full effect.');
+        
+        // Update CSP in index.html when IP changes
+        updateCSPInIndexHTML(newIP);
     }
 }, 60000); // Check every minute
 

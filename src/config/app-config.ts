@@ -1,8 +1,17 @@
-// Centralized configuration that automatically syncs with .env
+// Centralized configuration that reads from unified .env
 export const CONFIG = {
-  // API Configuration - automatically reads from .env
+  // API Configuration - reads from unified .env
   get API_URL(): string {
-    return import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    // Check if we're in development or production
+    const isDevelopment = import.meta.env.DEV;
+    
+    if (isDevelopment) {
+      // In development, use the backend host from .env file
+      return `http://${import.meta.env.VITE_BACKEND_HOST || 'localhost'}:${import.meta.env.VITE_BACKEND_PORT || '5000'}`;
+    } else {
+      // In production, use the configured API URL
+      return import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    }
   },
   
   get FRONTEND_HOST(): string {
@@ -10,7 +19,7 @@ export const CONFIG = {
   },
   
   get FRONTEND_PORT(): number {
-    return parseInt(import.meta.env.VITE_FRONTEND_PORT) || 5174;
+    return parseInt(import.meta.env.VITE_FRONTEND_PORT || '5174');
   },
   
   get BACKEND_HOST(): string {
@@ -18,7 +27,37 @@ export const CONFIG = {
   },
   
   get BACKEND_PORT(): number {
-    return parseInt(import.meta.env.VITE_BACKEND_PORT) || 5000;
+    return parseInt(import.meta.env.VITE_BACKEND_PORT || '5000');
+  },
+  
+  // IP Synchronization
+  async syncIPWithServer(): Promise<boolean> {
+    try {
+      const currentHost = this.FRONTEND_HOST;
+      const currentPort = this.FRONTEND_PORT;
+      
+      const response = await fetch(`${this.API_URL}/api/sync-ip`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          frontendHost: currentHost,
+          frontendPort: currentPort
+        })
+      });
+      
+      if (response.ok) {
+        console.log('✅ IP synchronized with server:', await response.json());
+        return true;
+      } else {
+        console.error('❌ Failed to sync IP with server');
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Error syncing IP:', error);
+      return false;
+    }
   },
   
   // Dynamic URL builders

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getApiUrl } from '../config/api';
+import { useToast } from '../contexts/ToastContext';
+import ConfirmationModal from './ConfirmationModal';
 import {
   UserPlusIcon,
   PencilIcon,
@@ -26,8 +28,11 @@ const AdminManagement: React.FC = () => {
     password: '',
     role: 'admin' as 'admin' | 'super_admin'
   });
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedAdminId, setSelectedAdminId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const { showSuccess, showError } = useToast();
 
   useEffect(() => {
     fetchAdmins();
@@ -77,11 +82,15 @@ const AdminManagement: React.FC = () => {
         setFormData({ username: '', password: '', role: 'admin' });
         setIsModalOpen(false);
         fetchAdmins();
+        showSuccess('Admin Created', 'New admin account has been created successfully.');
       } else {
         console.error('Failed to create admin:', response.status);
+        const errorData = await response.json();
+        showError('Creation Failed', errorData.message || 'Failed to create admin account.');
       }
     } catch (error) {
       console.error('Error creating admin:', error);
+      showError('Creation Failed', 'An error occurred while creating the admin account. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -119,26 +128,34 @@ const AdminManagement: React.FC = () => {
         setIsModalOpen(false);
         setEditingAdmin(null);
         fetchAdmins();
+        showSuccess('Admin Updated', 'Admin account has been updated successfully.');
       } else {
         console.error('Failed to update admin:', response.status);
+        const errorData = await response.json();
+        showError('Update Failed', errorData.message || 'Failed to update admin account.');
       }
     } catch (error) {
       console.error('Error updating admin:', error);
+      showError('Update Failed', 'An error occurred while updating the admin account. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleDelete = async (adminId: string) => {
-    if (!confirm('Are you sure you want to delete this admin account?')) {
-      return;
-    }
+    setSelectedAdminId(adminId);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    setShowDeleteModal(false);
+    if (!selectedAdminId) return;
 
     setIsLoading(true);
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(getApiUrl(`/api/users/admins/${adminId}`), {
+      const response = await fetch(getApiUrl(`/api/users/admins/${selectedAdminId}`), {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`
@@ -147,11 +164,15 @@ const AdminManagement: React.FC = () => {
 
       if (response.ok) {
         fetchAdmins();
+        showSuccess('Admin Deleted', 'Admin account has been deleted successfully.');
       } else {
         console.error('Failed to delete admin:', response.status);
+        const errorData = await response.json();
+        showError('Deletion Failed', errorData.message || 'Failed to delete admin account.');
       }
     } catch (error) {
       console.error('Error deleting admin:', error);
+      showError('Deletion Failed', 'An error occurred while deleting the admin account. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -173,11 +194,16 @@ const AdminManagement: React.FC = () => {
 
       if (response.ok) {
         fetchAdmins();
+        const action = currentStatus ? 'deactivated' : 'activated';
+        showSuccess('Status Updated', `Admin account has been ${action} successfully.`);
       } else {
         console.error('Failed to toggle admin status:', response.status);
+        const errorData = await response.json();
+        showError('Status Update Failed', errorData.message || 'Failed to update admin status.');
       }
     } catch (error) {
       console.error('Error toggling admin status:', error);
+      showError('Status Update Failed', 'An error occurred while updating admin status. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -404,6 +430,18 @@ const AdminManagement: React.FC = () => {
           </div>
         )}
       </div>
+      
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={confirmDelete}
+        title="Delete Admin Account"
+        message="Are you sure you want to delete this admin account? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        type="danger"
+      />
     </div>
   );
 };

@@ -1,0 +1,331 @@
+const mongoose = require('mongoose');
+
+const systemDesignSchema = new mongoose.Schema({
+  // Theme Configuration
+  theme: {
+    type: String,
+    enum: ['light', 'dark', 'custom'],
+    default: 'light'
+  },
+  
+  // Color Palette
+  colors: {
+    primary: {
+      type: String,
+      default: '#3B82F6'
+    },
+    secondary: {
+      type: String,
+      default: '#10B981'
+    },
+    accent: {
+      type: String,
+      default: '#F59E0B'
+    },
+    danger: {
+      type: String,
+      default: '#EF4444'
+    },
+    warning: {
+      type: String,
+      default: '#F59E0B'
+    },
+    success: {
+      type: String,
+      default: '#10B981'
+    },
+    info: {
+      type: String,
+      default: '#3B82F6'
+    },
+    background: {
+      type: String,
+      default: '#F9FAFB'
+    },
+    surface: {
+      type: String,
+      default: '#FFFFFF'
+    },
+    border: {
+      type: String,
+      default: '#E5E7EB'
+    },
+    text: {
+      primary: {
+        type: String,
+        default: '#111827'
+      },
+      secondary: {
+        type: String,
+        default: '#6B7280'
+      },
+      inverse: {
+        type: String,
+        default: '#FFFFFF'
+      }
+    }
+  },
+  
+  // Typography
+  typography: {
+    fontFamily: {
+      primary: {
+        type: String,
+        default: 'Inter, system-ui, sans-serif'
+      },
+      secondary: {
+        type: String,
+        default: 'Georgia, serif'
+      },
+      mono: {
+        type: String,
+        default: 'JetBrains Mono, monospace'
+      }
+    },
+    fontSize: {
+      xs: { type: String, default: '0.75rem' },
+      sm: { type: String, default: '0.875rem' },
+      base: { type: String, default: '1rem' },
+      lg: { type: String, default: '1.125rem' },
+      xl: { type: String, default: '1.25rem' },
+      '2xl': { type: String, default: '1.5rem' },
+      '3xl': { type: String, default: '1.875rem' },
+      '4xl': { type: String, default: '2.25rem' },
+      '5xl': { type: String, default: '3rem' },
+      '6xl': { type: String, default: '4rem' }
+    },
+    fontWeight: {
+      light: { type: String, default: '300' },
+      normal: { type: String, default: '400' },
+      medium: { type: String, default: '500' },
+      semibold: { type: String, default: '600' },
+      bold: { type: String, default: '700' },
+      extrabold: { type: String, default: '800' }
+    }
+  },
+  
+  // Component Styles
+  components: {
+    // Topbar/Header
+    topbar: {
+      backgroundColor: { type: String, default: '#1F2937' },
+      textColor: { type: String, default: '#FFFFFF' },
+      height: { type: String, default: '64px' },
+      boxShadow: { type: String, default: '0 1px 3px 0 rgba(0, 0, 0, 0.1)' },
+      border: { type: String, default: 'none' }
+    },
+    
+    // Buttons
+    button: {
+      primary: {
+        backgroundColor: { type: String, default: '#3B82F6' },
+        textColor: { type: String, default: '#FFFFFF' },
+        borderRadius: { type: String, default: '0.375rem' },
+        padding: { type: String, default: '0.5rem 1rem' },
+        fontSize: { type: String, default: '0.875rem' },
+        fontWeight: { type: String, default: '500' },
+        boxShadow: { type: String, default: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' },
+        border: { type: String, default: 'none' },
+        hoverBackgroundColor: { type: String, default: '#2563EB' }
+      },
+      secondary: {
+        backgroundColor: { type: String, default: '#6B7280' },
+        textColor: { type: String, default: '#FFFFFF' },
+        borderRadius: { type: String, default: '0.375rem' },
+        padding: { type: String, default: '0.5rem 1rem' },
+        fontSize: { type: String, default: '0.875rem' },
+        fontWeight: { type: String, default: '500' },
+        boxShadow: { type: String, default: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' },
+        border: { type: String, default: 'none' },
+        hoverBackgroundColor: { type: String, default: '#4B5563' }
+      },
+      danger: {
+        backgroundColor: { type: String, default: '#EF4444' },
+        textColor: { type: String, default: '#FFFFFF' },
+        borderRadius: { type: String, default: '0.375rem' },
+        padding: { type: String, default: '0.5rem 1rem' },
+        fontSize: { type: String, default: '0.875rem' },
+        fontWeight: { type: String, default: '500' },
+        boxShadow: { type: String, default: '0 1px 2px 0 rgba(0, 0, 0, 0.05)' },
+        border: { type: String, default: 'none' },
+        hoverBackgroundColor: { type: String, default: '#DC2626' }
+      }
+    },
+    
+    // Cards
+    card: {
+      backgroundColor: { type: String, default: '#FFFFFF' },
+      textColor: { type: String, default: '#111827' },
+      borderRadius: { type: String, default: '0.5rem' },
+      padding: { type: String, default: '1.5rem' },
+      boxShadow: { type: String, default: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)' },
+      border: { type: String, default: '1px solid #E5E7EB' },
+      headerBackgroundColor: { type: String, default: '#F9FAFB' },
+      headerTextColor: { type: String, default: '#111827' }
+    },
+    
+    // Tables
+    table: {
+      backgroundColor: { type: String, default: '#FFFFFF' },
+      headerBackgroundColor: { type: String, default: '#F9FAFB' },
+      headerTextColor: { type: String, default: '#111827' },
+      borderColor: { type: String, default: '#E5E7EB' },
+      rowHoverBackgroundColor: { type: String, default: '#F9FAFB' },
+      textColor: { type: String, default: '#111827' },
+      fontSize: { type: String, default: '0.875rem' },
+      padding: { type: String, default: '0.75rem 1rem' }
+    },
+    
+    // Forms/Inputs
+    input: {
+      backgroundColor: { type: String, default: '#FFFFFF' },
+      textColor: { type: String, default: '#111827' },
+      borderColor: { type: String, default: '#D1D5DB' },
+      borderRadius: { type: String, default: '0.375rem' },
+      padding: { type: String, default: '0.5rem 0.75rem' },
+      fontSize: { type: String, default: '0.875rem' },
+      border: { type: String, default: '1px solid #D1D5DB' },
+      focusBorderColor: { type: String, default: '#3B82F6' },
+      focusRing: { type: String, default: '0 0 0 3px rgba(59, 130, 246, 0.1)' },
+      placeholderColor: { type: String, default: '#6B7280' }
+    },
+    
+    // Navigation
+    navigation: {
+      backgroundColor: { type: String, default: '#FFFFFF' },
+      textColor: { type: String, default: '#111827' },
+      activeTextColor: { type: String, default: '#3B82F6' },
+      borderColor: { type: String, default: '#E5E7EB' },
+      borderRadius: { type: String, default: '0.5rem' },
+      padding: { type: String, default: '0.5rem 1rem' },
+      fontSize: { type: String, default: '0.875rem' },
+      fontWeight: { type: String, default: '500' }
+    },
+    
+    // Status indicators
+    status: {
+      success: {
+        backgroundColor: { type: String, default: '#10B981' },
+        textColor: { type: String, default: '#FFFFFF' }
+      },
+      warning: {
+        backgroundColor: { type: String, default: '#F59E0B' },
+        textColor: { type: String, default: '#FFFFFF' }
+      },
+      error: {
+        backgroundColor: { type: String, default: '#EF4444' },
+        textColor: { type: String, default: '#FFFFFF' }
+      },
+      info: {
+        backgroundColor: { type: String, default: '#3B82F6' },
+        textColor: { type: String, default: '#FFFFFF' }
+      }
+    }
+  },
+        type: String,
+        default: 'ring-2 ring-blue-500 ring-offset-2'
+      }
+    }
+  },
+  
+  // Layout
+  layout: {
+    container: {
+      maxWidth: {
+        type: String,
+        default: '1280px'
+      },
+      padding: {
+        type: String,
+        default: '1rem'
+      }
+    },
+    spacing: {
+      xs: { type: String, default: '0.25rem' },
+      sm: { type: String, default: '0.5rem' },
+      md: { type: String, default: '1rem' },
+      lg: { type: String, default: '1.5rem' },
+      xl: { type: String, default: '2rem' },
+      '2xl': { type: String, default: '3rem' }
+    }
+  },
+  
+  // Animation
+  animation: {
+    duration: {
+      fast: { type: String, default: '150ms' },
+      normal: { type: String, default: '300ms' },
+      slow: { type: String, default: '500ms' }
+    },
+    easing: {
+      linear: { type: String, default: 'linear' },
+      ease: { type: String, default: 'ease' },
+      easeIn: { type: String, default: 'ease-in' },
+      easeOut: { type: String, default: 'ease-out' },
+      easeInOut: { type: String, default: 'ease-in-out' }
+    }
+  },
+  
+  // Active status
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  
+  // Last updated by
+  lastUpdatedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    default: null
+  }
+}, {
+  timestamps: true
+});
+
+// Static method to get current design configuration
+systemDesignSchema.statics.getCurrentDesign = async function() {
+  let design = await this.findOne({ isActive: true }).sort({ updatedAt: -1 });
+  
+  // If no design exists, create a default one
+  if (!design) {
+    design = await this.create({
+      theme: 'light',
+      isActive: true
+    });
+  }
+  
+  return design;
+};
+
+// Static method to update design configuration
+systemDesignSchema.statics.updateDesign = async function(updateData, updatedBy = null) {
+  const currentDesign = await this.getCurrentDesign();
+  
+  // Handle superadmin case - don't try to set lastUpdatedBy for superadmin
+  const updateFields = {
+    ...updateData,
+    updatedAt: new Date()
+  };
+  
+  // Only set lastUpdatedBy if it's a valid ObjectId (not superadmin string)
+  if (updatedBy && updatedBy !== 'super-admin') {
+    updateFields.lastUpdatedBy = updatedBy;
+  }
+  
+  try {
+    return await this.findByIdAndUpdate(
+      currentDesign._id,
+      updateFields,
+      { new: true, upsert: true }
+    ).populate('lastUpdatedBy', 'username email');
+  } catch (error) {
+    // If populate fails (Admin model not available), return without population
+    return await this.findByIdAndUpdate(
+      currentDesign._id,
+      updateFields,
+      { new: true, upsert: true }
+    );
+  }
+};
+
+module.exports = mongoose.model('SystemDesign', systemDesignSchema);

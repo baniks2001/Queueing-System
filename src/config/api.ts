@@ -40,6 +40,17 @@ export const getApiUrl = (endpoint: string): string => {
   return fullUrl;
 };
 
+// Helper function to get upload URL (static files served from backend)
+export const getUploadUrl = (filename: string): string => {
+  const baseUrl = API_CONFIG.getServerUrl();
+  const uploadUrl = `${baseUrl}/uploads/${filename}`;
+  
+  // Debug logging
+  console.log('📁 Upload URL:', uploadUrl);
+  
+  return uploadUrl;
+};
+
 // Helper function to get socket URL
 export const getSocketUrl = (): string => {
   const socketUrl = API_CONFIG.getServerUrl();

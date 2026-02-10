@@ -1,6 +1,7 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const Queue = require('../models/Queue');
+const OnHoldQueue = require('../models/OnHoldQueue');
 const Service = require('../models/Service');
 const TransactionFlow = require('../models/TransactionFlow');
 const PersonType = require('../models/PersonType');
@@ -217,14 +218,46 @@ function getNextWindowInFlow(windowFlow, currentWindow) {
   return nextFlowItem ? nextFlowItem.windowNumber : null;
 }
 
+// Helper function to filter queues eligible for a specific window based on transaction flow
+function filterEligibleQueuesForWindow(queues, windowNum) {
+  return queues.filter(queue => {
+    // If queue has no window flow, it can come to any window
+    if (!queue.windowFlow || queue.windowFlow.length === 0) {
+      return true;
+    }
+    
+    // Check if this window is in the queue's transaction flow
+    const windowInFlow = queue.windowFlow.find(step => step.windowNumber === windowNum);
+    if (!windowInFlow) {
+      return false; // This window is not in the queue's transaction flow
+    }
+    
+    // For multi-step transactions, check if the queue is at the correct step
+    if (queue.windowFlow.length > 1) {
+      // If currentStep is 0, queue should go to first step
+      if (queue.currentStep === 0) {
+        const firstStep = queue.windowFlow.find(step => step.order === 1);
+        return firstStep && firstStep.windowNumber === windowNum;
+      }
+      
+      // Check if this window is the next step in the flow
+      const nextStep = queue.windowFlow.find(step => step.order === queue.currentStep);
+      return nextStep && nextStep.windowNumber === windowNum;
+    }
+    
+    // Single step transaction - this window is in flow, so it's eligible
+    return true;
+  });
+}
+
 // Helper function to sort queues with fair positioning (Low, Low, High, Low, High, Low, High...)
 async function sortQueuesWithFairPositioning(queues) {
-  // Filter out queues that are assigned to specific windows (in transit)
-  // Only include queues that are truly waiting for any window
-  const availableQueues = queues.filter(queue => !queue.currentWindow);
+  // Include all waiting queues, regardless of currentWindow assignment
+  // Queues with currentWindow but status 'waiting' are available for serving
+  const availableQueues = queues.filter(queue => queue.status === 'waiting');
   
-  console.log(`🎯 Available queues for fair positioning (excluding assigned): ${availableQueues.length}`);
-  console.log(`📋 Assigned queues (excluded): ${queues.length - availableQueues.length}`);
+  console.log(`🎯 Available queues for fair positioning: ${availableQueues.length}`);
+  console.log(`📋 Total queues processed: ${queues.length}`);
   
   // Separate queues by priority
   const lowPriorityQueues = [];
@@ -276,40 +309,10 @@ async function sortQueuesWithFairPositioning(queues) {
 router.get('/current', async (req, res) => {
   try {
     // First try to find proper serving queues
+    // Only return queues with proper serving status - no auto-assignment
+    // This allows manual control via Next Queue and Hold Queue buttons
     let currentQueues = await Queue.find({ status: 'serving' })
       .sort({ createdAt: 1 });
-
-    // If no serving queues found, check for queues assigned to windows but stuck in waiting status
-    if (currentQueues.length === 0) {
-      console.log('⚠️ No serving queues found, checking for stuck queues...');
-      const stuckQueues = await Queue.find({ 
-        status: 'waiting',
-        currentWindow: { $exists: true, $ne: null }
-      }).sort({ createdAt: 1 });
-      
-      if (stuckQueues.length > 0) {
-        console.log(`🔧 Found ${stuckQueues.length} stuck queues, updating to serving status...`);
-        
-        // Update all stuck queues to serving status
-        const updatePromises = stuckQueues.map(queue => 
-          Queue.updateOne(
-            { _id: queue._id },
-            { status: 'serving', serviceStartTime: new Date() }
-          )
-        );
-        
-        await Promise.all(updatePromises);
-        
-        // Return the updated queues
-        currentQueues = stuckQueues.map(queue => ({
-          ...queue.toObject(),
-          status: 'serving',
-          serviceStartTime: new Date()
-        }));
-        
-        console.log(`✅ Updated ${currentQueues.length} queues to serving status`);
-      }
-    }
 
     console.log(`📋 Total current queues: ${currentQueues.length}`);
     currentQueues.forEach(queue => {
@@ -376,7 +379,7 @@ router.post('/next/:windowNumber', authMiddleware, async (req, res) => {
       await nextQueue.save();
 
       if (global.io) {
-        global.io.emit('queueUpdated', {
+        global.io.emit('queueUpdate', {
           action: 'next',
           queueNumber: nextQueue.queueNumber,
           windowNumber: parseInt(windowNumber),
@@ -414,31 +417,12 @@ router.get('/current/:windowNumber', async (req, res) => {
       return res.status(400).json({ message: 'Invalid window number' });
     }
     
-    // First try to find queues with proper serving status
-    let currentQueue = await Queue.findOne({ 
+    // Only return queues with proper serving status - no auto-assignment
+    // This allows manual control via Next Queue and Hold Queue buttons
+    const currentQueue = await Queue.findOne({ 
       currentWindow: windowNum,
       status: 'serving' 
     });
-    
-    // If no serving queues found, check for queues assigned to this window but stuck in waiting status
-    if (!currentQueue) {
-      console.log(`⚠️ No serving queue found for Window ${windowNum}, checking for stuck queues...`);
-      currentQueue = await Queue.findOne({ 
-        currentWindow: windowNum,
-        status: 'waiting'
-      });
-      
-      // If found a stuck queue, update it to serving status
-      if (currentQueue) {
-        console.log(`🔧 Found stuck queue ${currentQueue.queueNumber} at Window ${windowNum}, updating to serving status`);
-        await Queue.updateOne(
-          { _id: currentQueue._id },
-          { status: 'serving', serviceStartTime: new Date() }
-        );
-        currentQueue.status = 'serving';
-        currentQueue.serviceStartTime = new Date();
-      }
-    }
     
     console.log(`📋 Current queue for Window ${windowNum}:`, currentQueue?.queueNumber || 'None');
     res.json(currentQueue);
@@ -457,16 +441,23 @@ router.get('/next/:windowNumber', async (req, res) => {
       return res.status(400).json({ message: 'Invalid window number' });
     }
     
-    // Find queues that should come to this window (either nextWindow or currentWindow)
-    const nextQueues = await Queue.find({ 
-      $or: [
-        { nextWindow: windowNum, status: 'waiting' },
-        { currentWindow: windowNum, status: 'waiting' }
-      ]
-    })
-    .sort({ createdAt: 1 })
-    .limit(10);
-    res.json(nextQueues);
+    // Get all waiting queues
+    const allWaitingQueues = await Queue.find({ status: 'waiting' })
+      .sort({ createdAt: 1 });
+    
+    console.log(`📋 All waiting queues for Window ${windowNum}: ${allWaitingQueues.length}`);
+    
+    // Filter queues that should come to this window based on transaction flow
+    const eligibleQueues = filterEligibleQueuesForWindow(allWaitingQueues, windowNum);
+    
+    console.log(`🎯 Eligible queues for Window ${windowNum}: ${eligibleQueues.length}`);
+    
+    // Apply fair positioning only on eligible queues
+    const sortedQueues = await sortQueuesWithFairPositioning(eligibleQueues);
+    
+    console.log(`🎯 Sorted queues for Window ${windowNum} (first 5):`, sortedQueues.slice(0, 5).map(q => ({ number: q.queueNumber, type: q.personType, service: q.service })));
+    
+    res.json(sortedQueues);
   } catch (error) {
     console.error('Get next queues error:', error);
     res.status(500).json({ message: 'Server error' });
@@ -488,7 +479,7 @@ router.post('/next-queue/:windowNumber', async (req, res) => {
       status: 'serving' 
     });
 
-    console.log(`🔍 Current queue found for window ${windowNum}:`, currentQueue?.queueNumber);
+    console.log(`🔍 Current queue found for window ${windowNum}:`, currentQueue?.queueNumber || 'None');
 
     let completedQueue = null;
     
@@ -591,13 +582,16 @@ router.post('/next-queue/:windowNumber', async (req, res) => {
       console.log(`⚠️ No current queue found for window ${windowNum}`);
     }
     
-    // Find next queue using fair positioning on ALL waiting queues
+    // Find next queue using fair positioning on ELIGIBLE waiting queues only
     const allWaitingQueues = await Queue.find({ status: 'waiting' })
       .sort({ createdAt: 1 });
     
-    console.log(`📋 All waiting queues count: ${allWaitingQueues.length}`);
+    // Filter queues that should come to this window based on transaction flow
+    const eligibleQueues = filterEligibleQueuesForWindow(allWaitingQueues, windowNum);
     
-    const sortedQueues = await sortQueuesWithFairPositioning(allWaitingQueues);
+    console.log(`🎯 Eligible queues for Window ${windowNum}: ${eligibleQueues.length}`);
+    
+    const sortedQueues = await sortQueuesWithFairPositioning(eligibleQueues);
     const nextQueue = sortedQueues[0] || null;
     
     console.log(`🎯 Next queue selected: ${nextQueue?.queueNumber || 'None'}`);
@@ -606,7 +600,9 @@ router.post('/next-queue/:windowNumber', async (req, res) => {
     let updatedQueue = null;
     let nextQueues = [];
     
-    if (nextQueue) {
+    // Only assign new queue if current queue was completed (not moved to next window)
+    // OR if current queue was moved to next window (we need a new queue for current window)
+    if (nextQueue && (!completedQueue || completedQueue.status === 'completed' || completedQueue.status === 'waiting')) {
       // Update next queue to serving at this window
       await Queue.updateOne(
         { _id: nextQueue._id },
@@ -619,12 +615,38 @@ router.post('/next-queue/:windowNumber', async (req, res) => {
       
       updatedQueue = { ...nextQueue.toObject(), status: 'serving', currentWindow: windowNum };
       
-      // Get remaining queues using fair positioning on ALL waiting queues
-      const allRemainingQueues = await Queue.find({ status: 'waiting' })
-        .sort({ createdAt: 1 });
-      
-      nextQueues = await sortQueuesWithFairPositioning(allRemainingQueues);
+      if (completedQueue && completedQueue.status === 'waiting') {
+        console.log(`📋 New queue assigned to Window ${windowNum} (previous queue moved to Window ${completedQueue.currentWindow}): ${updatedQueue.queueNumber}`);
+      } else {
+        console.log(`📋 New queue assigned to Window ${windowNum}: ${updatedQueue.queueNumber}`);
+      }
+    } else {
+      updatedQueue = null;
+      console.log(`📝 No more queues available for Window ${windowNum}`);
     }
+    
+    // Get remaining queues using fair positioning on ELIGIBLE waiting queues only
+    const allRemainingQueues = await Queue.find({ status: 'waiting' })
+      .sort({ createdAt: 1 });
+    
+    // Filter queues that should come to this window based on transaction flow
+    const eligibleRemainingQueues = filterEligibleQueuesForWindow(allRemainingQueues, windowNum);
+    
+    nextQueues = await sortQueuesWithFairPositioning(eligibleRemainingQueues);
+    
+    // IMPORTANT: Get the ACTUAL current queue for this window after all updates
+    // Add a small delay to ensure all database updates are committed
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    const actualCurrentQueue = await Queue.findOne({ 
+      currentWindow: windowNum,
+      status: 'serving' 
+    });
+    
+    console.log(`🔍 Final check - Actual current queue for Window ${windowNum}:`, actualCurrentQueue?.queueNumber || 'None');
+    
+    // Use the actual current queue in response
+    updatedQueue = actualCurrentQueue;
     
     // Emit real-time updates
     if (global.io) {
@@ -750,6 +772,209 @@ router.post('/repeat-announcement/:windowNumber', authMiddleware, async (req, re
     });
   } catch (error) {
     console.error('Repeat announcement error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get all on-hold queues for public display
+router.get('/on-hold/all', async (req, res) => {
+  try {
+    // Get all on-hold queues
+    const onHoldQueues = await OnHoldQueue.find({})
+      .sort({ holdStartTime: 1 }) // Oldest first
+      .limit(20);
+    
+    res.json(onHoldQueues);
+  } catch (error) {
+    console.error('Get all on-hold queues error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get on-hold queues for a specific window
+router.get('/on-hold/:windowNumber', async (req, res) => {
+  try {
+    const { windowNumber } = req.params;
+    
+    // Get on-hold queues for this window
+    const onHoldQueues = await OnHoldQueue.find({ currentWindow: parseInt(windowNumber) })
+      .sort({ holdStartTime: 1 }) // Oldest first
+      .limit(10);
+    
+    res.json(onHoldQueues);
+  } catch (error) {
+    console.error('Get on-hold queues error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Put queue on hold
+router.put('/hold/:queueId', authMiddleware, async (req, res) => {
+  try {
+    const { queueId } = req.params;
+    const { holdReason } = req.body;
+    
+    // Find the queue
+    const queue = await Queue.findById(queueId);
+    if (!queue) {
+      return res.status(404).json({ message: 'Queue not found' });
+    }
+    
+    // Create on-hold record
+    const onHoldQueue = new OnHoldQueue({
+      originalQueueId: queue._id,
+      queueNumber: queue.queueNumber,
+      personType: queue.personType,
+      service: queue.service,
+      transactionName: queue.transactionName,
+      transactionPrefix: queue.transactionPrefix,
+      currentStep: queue.currentStep,
+      totalSteps: queue.totalSteps,
+      windowFlow: queue.windowFlow,
+      holdStartTime: new Date(),
+      holdReason: holdReason || 'Manual hold by operator',
+      currentWindow: queue.currentWindow,
+      waitingTime: queue.waitingTime,
+      serviceStartTime: queue.serviceStartTime,
+      serviceEndTime: queue.serviceEndTime
+    });
+    
+    await onHoldQueue.save();
+    
+    // Update original queue status
+    queue.status = 'on-hold';
+    await queue.save();
+    
+    res.json({ message: 'Queue put on hold successfully', onHoldQueue });
+  } catch (error) {
+    console.error('Hold queue error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Serve on-hold queue
+router.post('/serve-on-hold/:queueId', authMiddleware, async (req, res) => {
+  try {
+    const { queueId } = req.params;
+    const { windowNumber } = req.body;
+    
+    console.log(`🎯 Serve on-hold request: queueId=${queueId}, windowNumber=${windowNumber}`);
+    
+    if (!windowNumber) {
+      console.log('❌ Window number missing in request body');
+      return res.status(400).json({ message: 'Window number is required' });
+    }
+    
+    // Find on-hold queue
+    const onHoldQueue = await OnHoldQueue.findById(queueId);
+    if (!onHoldQueue) {
+      console.log(`❌ On-hold queue not found: ${queueId}`);
+      return res.status(404).json({ message: 'On-hold queue not found' });
+    }
+    
+    // Find original queue
+    const originalQueue = await Queue.findById(onHoldQueue.originalQueueId);
+    if (!originalQueue) {
+      console.log(`❌ Original queue not found: ${onHoldQueue.originalQueueId}`);
+      return res.status(404).json({ message: 'Original queue not found' });
+    }
+    
+    console.log(`📋 Found original queue: ${originalQueue.queueNumber}, positioning as 2nd in waiting list`);
+    
+    // Position served queue as 2nd in waiting list
+    // Get all waiting queues and count current serving queues
+    const allWaitingQueues = await Queue.find({ status: 'waiting' })
+      .sort({ createdAt: 1 });
+    
+    const currentServingQueues = await Queue.find({ status: 'serving' });
+    const positionOffset = currentServingQueues.length; // Position after current serving queues
+    
+    console.log(`📊 Current serving queues: ${currentServingQueues.length}`);
+    console.log(`📊 Current waiting queues: ${allWaitingQueues.length}`);
+    console.log(`🎯 Positioning on-hold queue at position ${positionOffset + 2}`);
+    
+    // Update original queue to WAITING status with proper positioning
+    // PRESERVE the original window assignment - don't clear it!
+    originalQueue.status = 'waiting';
+    // Keep the original currentWindow - don't set to null!
+    originalQueue.updatedAt = new Date();
+    
+    // Position as 2nd by updating createdAt to be after 1 queue
+    if (allWaitingQueues.length >= 1) {
+      // Get 1st queue's createdAt and add 1 second to be after it
+      const firstQueueCreatedAt = new Date(allWaitingQueues[0].createdAt);
+      originalQueue.createdAt = new Date(firstQueueCreatedAt.getTime() + 1000); // Add 1 second to be 2nd
+      console.log(`🔄 Updated createdAt to position queue as 2nd: ${originalQueue.createdAt}`);
+    } else {
+      // No waiting queues, position at beginning
+      originalQueue.createdAt = new Date();
+      console.log(`🔄 Updated createdAt to position queue at beginning: ${originalQueue.createdAt}`);
+    }
+    
+    await originalQueue.save();
+    
+    // Delete on-hold record
+    await OnHoldQueue.findByIdAndDelete(queueId);
+    
+    // Get updated queues
+    const [currentQueues, nextQueues, onHoldQueues] = await Promise.all([
+      Queue.find({ status: 'serving' }),
+      Queue.find({ status: 'waiting' }).sort({ createdAt: 1 }).limit(5),
+      OnHoldQueue.find({ currentWindow: parseInt(windowNumber) }).sort({ holdStartTime: 1 }).limit(5)
+    ]);
+    
+    console.log(`✅ Successfully served on-hold queue ${originalQueue.queueNumber} at Window ${windowNumber}`);
+    
+    res.json({ 
+      message: 'On-hold queue served successfully',
+      currentQueue: originalQueue,
+      nextQueues,
+      onHoldQueues
+    });
+  } catch (error) {
+    console.error('Serve on-hold queue error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Reset all on-hold queues
+router.post('/reset-on-hold', async (req, res) => {
+  try {
+    console.log('🔄 Resetting all on-hold queues...');
+    
+    // Delete all on-hold records
+    const deletedCount = await OnHoldQueue.deleteMany({});
+    
+    // Find all queues that have on-hold status and reset them to waiting
+    const resetCount = await Queue.updateMany(
+      { status: 'on-hold' },
+      { 
+        status: 'waiting',
+        currentWindow: null,
+        updatedAt: new Date()
+      }
+    );
+    
+    console.log(`✅ Reset ${deletedCount.deletedCount} on-hold records`);
+    console.log(`✅ Reset ${resetCount.modifiedCount} queues from on-hold to waiting`);
+    
+    // Get updated queue counts
+    const [currentQueues, waitingQueues, onHoldQueues] = await Promise.all([
+      Queue.find({ status: 'serving' }),
+      Queue.find({ status: 'waiting' }).sort({ createdAt: 1 }),
+      OnHoldQueue.find({}).sort({ holdStartTime: 1 })
+    ]);
+    
+    res.json({ 
+      message: 'On-hold queues reset successfully',
+      deletedOnHoldRecords: deletedCount.deletedCount,
+      resetQueues: resetCount.modifiedCount,
+      currentQueues,
+      waitingQueues,
+      onHoldQueues
+    });
+  } catch (error) {
+    console.error('Reset on-hold queues error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

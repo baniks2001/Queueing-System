@@ -1,10 +1,16 @@
 const mongoose = require('mongoose');
 
-const queueSchema = new mongoose.Schema({
+const onHoldQueueSchema = new mongoose.Schema({
+  // Reference to original queue
+  originalQueueId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Queue',
+    required: true
+  },
+  // Copy of essential queue data for redundancy
   queueNumber: {
     type: String,
-    required: true,
-    unique: true
+    required: true
   },
   personType: {
     type: String,
@@ -36,23 +42,22 @@ const queueSchema = new mongoose.Schema({
     windowNumber: Number,
     order: Number
   }],
-  status: {
-    type: String,
-    enum: ['waiting', 'serving', 'completed', 'missed', 'on-hold'],
-    default: 'waiting'
+  // On-hold specific fields
+  holdStartTime: {
+    type: Date,
+    default: Date.now
   },
+  holdReason: {
+    type: String,
+    required: false,
+    default: 'Manual hold by operator'
+  },
+  // Window assignment
   currentWindow: {
     type: Number,
     default: null
   },
-  nextWindow: {
-    type: Number,
-    default: null
-  },
-  previousWindows: [{
-    windowNumber: Number,
-    timestamp: Date
-  }],
+  // Timing fields
   waitingTime: {
     type: Number,
     default: 0
@@ -65,6 +70,7 @@ const queueSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  // Metadata
   createdAt: {
     type: Date,
     default: Date.now
@@ -75,9 +81,9 @@ const queueSchema = new mongoose.Schema({
   }
 });
 
-queueSchema.pre('save', function(next) {
+onHoldQueueSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   next();
 });
 
-module.exports = mongoose.model('Queue', queueSchema);
+module.exports = mongoose.model('OnHoldQueue', onHoldQueueSchema);

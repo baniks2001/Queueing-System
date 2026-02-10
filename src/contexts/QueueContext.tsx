@@ -51,55 +51,6 @@ export const QueueProvider: React.FC<QueueProviderProps> = ({ children }) => {
   const [waitingQueues, setWaitingQueues] = useState<Queue[]>([]);
   const [socket, setSocket] = useState<Socket | null>(null);
 
-  useEffect(() => {
-    const newSocket = io(getSocketUrl(), {
-      transports: ['websocket', 'polling'],
-      timeout: 20000,
-      forceNew: true,
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000
-    });
-    setSocket(newSocket);
-
-    newSocket.on('connect', () => {
-      console.log('🔌 Socket connected');
-      refreshQueues();
-    });
-
-    newSocket.on('disconnect', () => {
-      console.log('🔌 Socket disconnected');
-    });
-
-    newSocket.on('queueGenerated', (data) => {
-      console.log('New queue generated:', data);
-      refreshQueues();
-    });
-
-    newSocket.on('queueUpdated', (data) => {
-      console.log('Queue updated:', data);
-      refreshQueues();
-    });
-
-    newSocket.on('soundNotification', (data) => {
-      console.log('Sound notification:', data);
-      playSound(data.queueNumber, data.windowNumber);
-    });
-
-    newSocket.on('repeat-announcement', (data) => {
-      console.log('Repeat announcement triggered:', data);
-      // Trigger repeat announcement in PublicDisplay
-    });
-
-    newSocket.on('connect_error', (error) => {
-      console.error('Socket connection error:', error);
-    });
-
-    return () => {
-      newSocket.close();
-    };
-  }, []);
-
   const playSound = (queueNumber: string, windowNumber: number) => {
     const utterance = new SpeechSynthesisUtterance(
       `Now serving number ${queueNumber} at window ${windowNumber}`
@@ -136,15 +87,73 @@ export const QueueProvider: React.FC<QueueProviderProps> = ({ children }) => {
   };
 
   useEffect(() => {
+    const newSocket = io(getSocketUrl(), {
+      transports: ['websocket', 'polling'],
+      timeout: 20000,
+      forceNew: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000
+    });
+
+    newSocket.on('connect', () => {
+      console.log('🔌 Socket connected');
+      refreshQueues();
+    });
+
+    newSocket.on('disconnect', () => {
+      console.log('🔌 Socket disconnected');
+    });
+
+    newSocket.on('queueGenerated', (data) => {
+      console.log('New queue generated:', data);
+      refreshQueues();
+    });
+
+    newSocket.on('queueUpdated', (data) => {
+      console.log('Queue updated:', data);
+      refreshQueues();
+    });
+
+    newSocket.on('soundNotification', (data) => {
+      console.log('Sound notification:', data);
+      playSound(data.queueNumber, data.windowNumber);
+    });
+
+    newSocket.on('repeat-announcement', (data) => {
+      console.log('Repeat announcement triggered:', data);
+      // Trigger repeat announcement in PublicDisplay
+    });
+
+    newSocket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+    });
+
+    // Use setTimeout to avoid synchronous setState
+    setTimeout(() => {
+      setSocket(newSocket);
+    }, 0);
+
+    return () => {
+      newSocket.close();
+    };
+  }, []);
+
+  useEffect(() => {
     // Initial load
-    refreshQueues();
+    const timer = setTimeout(() => {
+      refreshQueues();
+    }, 0);
     
     // Set up periodic refresh with reasonable interval
     const interval = setInterval(() => {
       refreshQueues();
     }, 10000); // 10 seconds
     
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
   }, []);
 
   const generateQueue = async (transactionName: string, personType: string): Promise<Queue> => {
