@@ -68,7 +68,7 @@ const AdminDashboard: React.FC = () => {
   const [selectedTransaction, setSelectedTransaction] = useState<TransactionHistory | null>(null);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const { showSuccess, showError, showWarning, showInfo } = useToast();
+  const { showSuccess, showError, showWarning } = useToast();
 
   // Define tabs first
   const tabs = [
