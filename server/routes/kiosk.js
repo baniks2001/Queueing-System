@@ -6,7 +6,7 @@ const fs = require('fs');
 const Queue = require('../models/Queue');
 const TransactionHistory = require('../models/TransactionHistory');
 const KioskStatus = require('../models/KioskStatus');
-const { authMiddleware, requireAdmin } = require('../middleware/auth');
+const { authMiddleware, requireAdmin, requireSuperAdmin } = require('../middleware/auth');
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -68,7 +68,7 @@ router.get('/status', async (req, res) => {
 });
 
 // Open kiosk
-router.post('/open', authMiddleware, requireAdmin, async (req, res) => {
+router.post('/open', authMiddleware, requireSuperAdmin, async (req, res) => {
   try {
     console.log('🔧 Kiosk open request received');
     const { title, governmentOfficeName, message } = req.body;
@@ -97,7 +97,7 @@ router.post('/open', authMiddleware, requireAdmin, async (req, res) => {
 });
 
 // Standby kiosk
-router.post('/standby', authMiddleware, requireAdmin, async (req, res) => {
+router.post('/standby', authMiddleware, requireSuperAdmin, async (req, res) => {
   try {
     console.log('🔧 Kiosk standby request received');
     const { title, governmentOfficeName, message } = req.body;
@@ -124,7 +124,7 @@ router.post('/standby', authMiddleware, requireAdmin, async (req, res) => {
 });
 
 // Close kiosk
-router.post('/close', authMiddleware, requireAdmin, async (req, res) => {
+router.post('/close', authMiddleware, requireSuperAdmin, async (req, res) => {
   try {
     console.log('🔧 Kiosk close request received');
     const today = new Date().toDateString();
@@ -206,7 +206,7 @@ router.post('/close', authMiddleware, requireAdmin, async (req, res) => {
 });
 
 // Get transaction history
-router.get('/transactions', authMiddleware, requireAdmin, async (req, res) => {
+router.get('/transactions', authMiddleware, requireSuperAdmin, async (req, res) => {
   try {
     console.log('🔧 Transaction history request received');
     const transactions = await TransactionHistory.find().sort({ date: -1 });
@@ -220,7 +220,7 @@ router.get('/transactions', authMiddleware, requireAdmin, async (req, res) => {
 });
 
 // Export transaction to CSV
-router.get('/export/:id', authMiddleware, requireAdmin, async (req, res) => {
+router.get('/export/:id', authMiddleware, requireSuperAdmin, async (req, res) => {
   try {
     const transaction = await TransactionHistory.findById(req.params.id);
     
@@ -228,26 +228,37 @@ router.get('/export/:id', authMiddleware, requireAdmin, async (req, res) => {
       return res.status(404).json({ message: 'Transaction not found' });
     }
     
-    // Create CSV content
-    let csvContent = 'Date,Title,Total Transactions,Queue Numbers,Transaction Types\n';
+    // Create enhanced CSV content matching Transaction Summary format
+    let csvContent = 'Transaction Summary Report\n';
+    csvContent += `Generated on,${new Date().toLocaleDateString()}\n`;
+    csvContent += `Status,Kiosk Closed Successfully! All transactions have been saved to database.\n\n`;
     
-    // Add transaction types
-    Object.entries(transaction.transactionTypes).forEach(([type, count]) => {
-      csvContent += `,${type}`;
-    });
-    csvContent += '\n';
+    // Session Details Section
+    csvContent += 'Session Details\n';
+    csvContent += `Transaction Name,${transaction.title}\n`;
+    csvContent += `Date,${new Date(transaction.date).toLocaleDateString()}\n`;
+    csvContent += `Total Transactions,${transaction.totalTransactions}\n`;
+    csvContent += `Queue Numbers,${transaction.queueNumbers.length} queues\n\n`;
     
-    // Add data row
-    csvContent += `${transaction.date},${transaction.title},${transaction.totalTransactions},"${transaction.queueNumbers.join('; ')}"`;
+    // Transaction Types Section
+    csvContent += 'Transaction Types\n';
+    csvContent += 'Type,Count\n';
     
-    // Add transaction type counts
-    Object.entries(transaction.transactionTypes).forEach(([type, count]) => {
-      csvContent += `,${count}`;
-    });
-    csvContent += '\n';
+    if (transaction.transactionTypes && Object.keys(transaction.transactionTypes).length > 0) {
+      // Handle both Map and Object structures
+      const types = transaction.transactionTypes instanceof Map 
+        ? Array.from(transaction.transactionTypes.entries())
+        : Object.entries(transaction.transactionTypes);
+      
+      types.forEach(([type, count]) => {
+        csvContent += `${type},${count}\n`;
+      });
+    } else {
+      csvContent += 'No transaction types recorded\n';
+    }
     
     res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename="transaction-${transaction.date}.csv"`);
+    res.setHeader('Content-Disposition', `attachment; filename="transaction-summary-${transaction.date}.csv"`);
     res.send(csvContent);
   } catch (error) {
     console.error('Error exporting transaction:', error);
@@ -256,7 +267,7 @@ router.get('/export/:id', authMiddleware, requireAdmin, async (req, res) => {
 });
 
 // Delete transaction
-router.delete('/transactions/:id', authMiddleware, requireAdmin, async (req, res) => {
+router.delete('/transactions/:id', authMiddleware, requireSuperAdmin, async (req, res) => {
   try {
     const deletedTransaction = await TransactionHistory.findByIdAndDelete(req.params.id);
     
@@ -272,7 +283,7 @@ router.delete('/transactions/:id', authMiddleware, requireAdmin, async (req, res
 });
 
 // Get kiosk status with full details (admin only)
-router.get('/status/admin', authMiddleware, requireAdmin, async (req, res) => {
+router.get('/status/admin', authMiddleware, requireSuperAdmin, async (req, res) => {
   try {
     const kioskStatus = await KioskStatus.getCurrentStatus();
     const activeQueues = await Queue.find({ status: { $in: ['waiting', 'serving'] } });
@@ -289,7 +300,7 @@ router.get('/status/admin', authMiddleware, requireAdmin, async (req, res) => {
 });
 
 // Update kiosk settings (admin only)
-router.put('/settings', authMiddleware, requireAdmin, async (req, res) => {
+router.put('/settings', authMiddleware, requireSuperAdmin, async (req, res) => {
   try {
     const { title, governmentOfficeName, message, businessHours, autoOpenClose } = req.body;
     
@@ -312,7 +323,7 @@ router.put('/settings', authMiddleware, requireAdmin, async (req, res) => {
 });
 
 // Upload logo (admin only)
-router.post('/upload-logo', authMiddleware, requireAdmin, (req, res, next) => {
+router.post('/upload-logo', authMiddleware, requireSuperAdmin, (req, res, next) => {
   upload.single('logo')(req, res, (err) => {
     if (err instanceof multer.MulterError) {
       console.log('❌ Multer error:', err);
@@ -372,7 +383,7 @@ router.post('/upload-logo', authMiddleware, requireAdmin, (req, res, next) => {
 });
 
 // Toggle kiosk status (admin only)
-router.post('/toggle', authMiddleware, requireAdmin, async (req, res) => {
+router.post('/toggle', authMiddleware, requireSuperAdmin, async (req, res) => {
   try {
     const currentStatus = await KioskStatus.getCurrentStatus();
     let newStatus;
@@ -401,7 +412,7 @@ router.post('/toggle', authMiddleware, requireAdmin, async (req, res) => {
 });
 
 // Set specific kiosk status (admin only)
-router.post('/set-status', authMiddleware, requireAdmin, async (req, res) => {
+router.post('/set-status', authMiddleware, requireSuperAdmin, async (req, res) => {
   try {
     const { status, title, message } = req.body;
     

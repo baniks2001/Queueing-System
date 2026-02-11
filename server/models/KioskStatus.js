@@ -39,8 +39,7 @@ const kioskStatusSchema = new mongoose.Schema({
     default: null
   },
   lastUpdatedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Admin',
+    type: mongoose.Schema.Types.Mixed,
     default: null
   },
   businessHours: {
@@ -131,13 +130,22 @@ kioskStatusSchema.statics.updateStatus = async function(updateData, updatedBy = 
   }
   
   try {
-    return await this.findByIdAndUpdate(
-      currentStatus._id,
-      updateFields,
-      { new: true, upsert: true }
-    ).populate('lastUpdatedBy', 'username email');
+    // Only populate if updatedBy is an ObjectId (regular admin), not for superadmin (string)
+    if (updatedBy && typeof updatedBy === 'object' && updatedBy.constructor.name === 'ObjectId') {
+      return await this.findByIdAndUpdate(
+        currentStatus._id,
+        updateFields,
+        { new: true, upsert: true }
+      ).populate('lastUpdatedBy', 'username email');
+    } else {
+      return await this.findByIdAndUpdate(
+        currentStatus._id,
+        updateFields,
+        { new: true, upsert: true }
+      );
+    }
   } catch (error) {
-    // If populate fails (Admin model not available), return without population
+    // If populate fails, return without population
     return await this.findByIdAndUpdate(
       currentStatus._id,
       updateFields,

@@ -62,6 +62,7 @@ const AdminDashboard: React.FC = () => {
   const [transactionHistory, setTransactionHistory] = useState<TransactionHistory[]>([]);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
+  const [showTransactionSummaryModal, setShowTransactionSummaryModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
   const [closeModalData, setCloseModalData] = useState<any>(null);
@@ -260,7 +261,10 @@ const AdminDashboard: React.FC = () => {
         // Show transaction history modal if there are transactions
         if (data.transactionHistory && data.transactionHistory.totalTransactions > 0) {
           setCloseModalData(data.transactionHistory);
-          setShowCloseModal(true);
+          // Use setTimeout to ensure confirmation modal is fully closed before showing summary
+          setTimeout(() => {
+            setShowTransactionSummaryModal(true);
+          }, 300);
         } else {
           showSuccess('Kiosk Closed', 'Public Kiosk closed successfully! No transactions to save. All on-hold queues have been reset.');
         }
@@ -809,15 +813,15 @@ const AdminDashboard: React.FC = () => {
   };
 
   const renderCloseModal = () => {
-    if (!showCloseModal || !closeModalData) return null;
+    if (!showTransactionSummaryModal || !closeModalData) return null;
 
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
         <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4">
           <div className="flex justify-between items-center mb-4 p-6 border-b">
             <h3 className="text-lg font-semibold text-gray-900">Transaction Summary</h3>
             <button
-              onClick={() => setShowCloseModal(false)}
+              onClick={() => setShowTransactionSummaryModal(false)}
               className="text-gray-400 hover:text-gray-600"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -874,7 +878,7 @@ const AdminDashboard: React.FC = () => {
             
             <div className="mt-6 flex justify-end">
               <button
-                onClick={() => setShowCloseModal(false)}
+                onClick={() => setShowTransactionSummaryModal(false)}
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 Close

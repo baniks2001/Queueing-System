@@ -7,6 +7,17 @@ const TransactionFlow = require('../models/TransactionFlow');
 const { authMiddleware, requireAdmin } = require('../middleware/auth');
 const router = express.Router();
 
+// Public endpoint for person types (no authentication required)
+router.get('/person-types/public', async (req, res) => {
+  try {
+    const personTypes = await PersonType.find({ isActive: true }).sort({ name: 1 });
+    res.json(personTypes);
+  } catch (error) {
+    console.error('Get public person types error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Apply authentication middleware to all admin routes
 router.use(authMiddleware);
 router.use(requireAdmin);
@@ -230,17 +241,6 @@ router.get('/person-types', async (req, res) => {
     res.json(personTypes);
   } catch (error) {
     console.error('Get person types error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-// Public endpoint for person types (no authentication required)
-router.get('/person-types/public', async (req, res) => {
-  try {
-    const personTypes = await PersonType.find({ isActive: true }).sort({ name: 1 });
-    res.json(personTypes);
-  } catch (error) {
-    console.error('Get public person types error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

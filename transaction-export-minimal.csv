@@ -1,0 +1,14 @@
+Transaction Summary Report
+Generated on,2/11/2026
+Status,Kiosk Closed Successfully! All transactions have been saved to database.
+
+Session Details
+Transaction Name,Test Kiosk
+Date,2/11/2026
+Total Transactions,1
+Queue Numbers,1 queues
+
+Transaction Types
+Type,Count
+TESTING,1
+TST001

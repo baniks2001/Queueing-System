@@ -93,7 +93,7 @@ const PublicKiosk: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         console.log('Person types from API:', data);
-        setPersonTypes(Array.isArray(data) ? data.filter((type: { isActive: boolean }) => type.isActive) : []);
+        setPersonTypes(Array.isArray(data) ? data : []);
       } else {
         console.error('Failed to fetch person types:', response.statusText);
         setPersonTypes([]);

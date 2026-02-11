@@ -2,11 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { getApiUrl } from '../../config/api';
+import { io } from 'socket.io-client';
 import {
   ArrowRightOnRectangleIcon,
   PlayIcon,
   UserGroupIcon,
-  SpeakerWaveIcon
+  SpeakerWaveIcon,
+  MicrophoneIcon
 } from '@heroicons/react/24/outline';
 
 // Cross-browser compatibility utilities
@@ -106,6 +108,9 @@ export default function WindowDashboard() {
   const [nextQueues, setNextQueues] = useState<Queue[]>([]);
   const [onHoldQueues, setOnHoldQueues] = useState<Queue[]>([]);
   const [isCalling, setIsCalling] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [customMessage, setCustomMessage] = useState('');
+  const [isAnnouncing, setIsAnnouncing] = useState(false);
 
   useEffect(() => {
     console.log('Window Dashboard - User object:', user);
@@ -113,23 +118,93 @@ export default function WindowDashboard() {
     
     // Only fetch queues if user is available and has a windowNumber
     if (user && user.windowNumber) {
-      fetchCurrentQueue();
-      fetchNextQueues();
-      fetchOnHoldQueues();
+      // Initial fetch
+      const fetchData = async () => {
+        try {
+          await Promise.all([
+            fetchCurrentQueue(),
+            fetchNextQueues(),
+            fetchOnHoldQueues()
+          ]);
+          setIsLoading(false);
+        } catch (error) {
+          console.error('Error fetching initial data:', error);
+          setIsLoading(false);
+        }
+      };
+      
+      fetchData();
       
       // Set up periodic refresh for data only
       const interval = setInterval(() => {
         // Only refresh if not currently calling to avoid conflicts
         if (!isCalling) {
-          fetchCurrentQueue();
-          fetchNextQueues();
-          fetchOnHoldQueues();
+          fetchData();
         }
       }, 3000); // Refresh every 3 seconds for better responsiveness
       
       return () => clearInterval(interval);
+    } else {
+      // Set loading to false if no user or windowNumber
+      setIsLoading(false);
     }
-  }, [user, isCalling, fetchCurrentQueue, fetchNextQueues, fetchOnHoldQueues]);
+  }, [user, isCalling]); // Remove callback functions from dependencies
+
+  // Socket connection for custom announcements
+  useEffect(() => {
+    const socket = io(getApiUrl(''), {
+      transports: ['websocket', 'polling'],
+      upgrade: false
+    });
+
+    socket.on('connect', () => {
+      console.log('✅ Window Dashboard connected to server via Socket.IO');
+    });
+
+    socket.on('disconnect', () => {
+      console.log('❌ Window Dashboard disconnected from server');
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
+
+  // Custom announcement function
+  const sendCustomAnnouncement = useCallback(async () => {
+    if (!customMessage.trim() || !user?.windowNumber) {
+      return;
+    }
+
+    setIsAnnouncing(true);
+    
+    try {
+      // Send custom announcement to server
+      const response = await fetch(getApiUrl('/api/custom-announcement'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          message: customMessage.trim(),
+          windowNumber: user.windowNumber,
+          type: 'custom'
+        })
+      });
+
+      if (response.ok) {
+        console.log(`✅ Custom announcement sent: "${customMessage}" for Window ${user.windowNumber}`);
+        setCustomMessage('');
+      } else {
+        console.error('❌ Failed to send custom announcement');
+      }
+    } catch (error) {
+      console.error('💥 Error sending custom announcement:', error);
+    } finally {
+      setIsAnnouncing(false);
+    }
+  }, [customMessage, user?.windowNumber]);
 
   const fetchCurrentQueue = useCallback(async () => {
     try {
@@ -154,11 +229,6 @@ export default function WindowDashboard() {
         console.log(`📋 Queue Number: ${data?.queueNumber}`);
         console.log(`🏢 Assigned Window: ${data?.currentWindow}`);
         
-        // Check if this is a new queue (different from previous)
-        if (data && (!currentQueue || data._id !== currentQueue._id)) {
-          console.log(`🆕 New queue received: ${data.queueNumber} at Window ${data.currentWindow}`);
-        }
-        
         setCurrentQueue(data);
       } else {
         console.error(`❌ Current queue failed for Window ${windowNumber} with status:`, response.status);
@@ -168,7 +238,7 @@ export default function WindowDashboard() {
       console.error(`💥 Error fetching current queue for Window ${user?.windowNumber}:`, error);
       setCurrentQueue(null);
     }
-  }, [user, currentQueue]);
+  }, [user?.windowNumber]);
 
   const fetchOnHoldQueues = useCallback(async () => {
     try {
@@ -200,7 +270,7 @@ export default function WindowDashboard() {
       console.error(`💥 Error fetching on-hold queues for Window ${user?.windowNumber}:`, error);
       setOnHoldQueues([]);
     }
-  }, [user]);
+  }, [user?.windowNumber]);
 
   const fetchNextQueues = useCallback(async () => {
     try {
@@ -233,7 +303,7 @@ export default function WindowDashboard() {
       console.error(`💥 Error fetching next queues for Window ${user?.windowNumber}:`, error);
       setNextQueues([]);
     }
-  }, [user]);
+  }, [user?.windowNumber]);
 
   const handleHoldQueue = async () => {
     if (isCalling || !currentQueue) return;
@@ -423,7 +493,7 @@ export default function WindowDashboard() {
       speak(utterance: SpeechSynthesisUtterance): void;
     }
     
-    interface ExtendedWindow extends Window {
+    interface ExtendedWindow extends Omit<Window, 'speechSynthesis'> {
       speechSynthesis?: SpeechSynthesis;
       webkitSpeechSynthesis?: SpeechSynthesis;
       mozSpeechSynthesis?: SpeechSynthesis;
@@ -559,7 +629,41 @@ export default function WindowDashboard() {
     safeNavigate(navigate, '/window/login');
   };
 
+  // Show loading state while checking authentication
+if (isLoading) {
   return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="flex flex-col items-center space-y-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <p className="text-gray-600 text-sm">Loading dashboard...</p>
+      </div>
+    </div>
+  );
+}
+
+// Show error state if user is not available or doesn't have windowNumber
+if (!user || !user.windowNumber) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="flex flex-col items-center space-y-4 p-8">
+        <div className="text-red-600 text-center">
+          <h2 className="text-xl font-semibold mb-2">Authentication Error</h2>
+          <p className="text-gray-600 mb-4">
+            {!user ? 'No user authentication found.' : 'No window number assigned to user.'}
+          </p>
+          <button
+            onClick={handleLogout}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          >
+            Return to Login
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+return (
     <div className="min-h-screen bg-gray-50">
       {/* Header - Fixed Position Mobile */}
       <div className="bg-blue-600 shadow-md border-b border-blue-700 fixed top-0 left-0 right-0 z-50">
@@ -779,6 +883,61 @@ export default function WindowDashboard() {
                 <SpeakerWaveIcon className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 mr-2 sm:mr-3" />
                 <span className="text-sm sm:text-base lg:text-lg">REPEAT ANNOUNCEMENT BUTTON</span>
               </button>
+              
+              {/* Custom Announcement Section */}
+              <div className="bg-white rounded-lg shadow-lg p-2 sm:p-3 lg:p-4 mt-3">
+                <div className="text-center">
+                  <h3 className="text-xs sm:text-sm font-semibold text-gray-900 flex items-center justify-center">
+                    <MicrophoneIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-1 text-purple-600" />
+                    Custom Announcement
+                  </h3>
+                </div>
+                
+                <div className="mt-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="flex-1">
+                      <label htmlFor="customMessage" className="block text-xs font-medium text-gray-700 mb-1">
+                        Message:
+                      </label>
+                      <textarea
+                        id="customMessage"
+                        value={customMessage}
+                        onChange={(e) => setCustomMessage(e.target.value)}
+                        placeholder="Type your message..."
+                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                        rows={1}
+                        maxLength={200}
+                        disabled={isAnnouncing}
+                      />
+                      <div className="text-xs text-gray-500 mt-1">
+                        {customMessage.length}/200
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={sendCustomAnnouncement}
+                      disabled={!customMessage.trim() || isAnnouncing}
+                      className="bg-purple-600 text-white py-2 px-3 rounded-md text-xs font-semibold hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center whitespace-nowrap"
+                    >
+                      {isAnnouncing ? (
+                        <>
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1"></div>
+                          <span className="text-xs">Sending...</span>
+                        </>
+                      ) : (
+                        <>
+                          <MicrophoneIcon className="h-3 w-3 mr-1" />
+                          <span className="text-xs">SEND</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  
+                  <div className="text-xs text-gray-600 text-center mt-2">
+                    Announce with window number {user?.windowNumber} on public display
+                  </div>
+                </div>
+              </div>
               
               {/* On Hold Queue Count - Only show if there are queues */}
               {onHoldQueues.length > 0 && (

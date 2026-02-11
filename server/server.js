@@ -174,6 +174,9 @@ const servicesRoutes = require('./routes/services');
 const transactionFlowRoutes = require('./routes/transactionFlow');
 const kioskRoutes = require('./routes/kiosk');
 
+// Import middleware
+const { authMiddleware } = require('./middleware/auth');
+
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.SERVER_PORT || 5000;
@@ -462,6 +465,61 @@ app.get('/', (req, res) => {
             transactionFlows: '/api/transaction-flows'
         }
     });
+});
+
+// Custom Announcement Endpoint
+app.post('/api/custom-announcement', authMiddleware, (req, res) => {
+    try {
+        const { message, windowNumber, type } = req.body;
+        
+        // Validate input
+        if (!message || !windowNumber || !type) {
+            return res.status(400).json({ 
+                error: 'Message, window number, and type are required' 
+            });
+        }
+        
+        // Validate message length
+        if (message.trim().length === 0 || message.trim().length > 200) {
+            return res.status(400).json({ 
+                error: 'Message must be between 1 and 200 characters' 
+            });
+        }
+        
+        // Validate window number
+        if (isNaN(windowNumber) || windowNumber < 1 || windowNumber > 99) {
+            return res.status(400).json({ 
+                error: 'Window number must be between 1 and 99' 
+            });
+        }
+        
+        console.log(`🎤 Custom announcement received: "${message.trim()}" for Window ${windowNumber} from user ${req.user.username}`);
+        
+        // Broadcast custom announcement to all PublicDisplay clients
+        io.emit('custom-announcement', {
+            message: message.trim(),
+            windowNumber: parseInt(windowNumber),
+            type: type,
+            timestamp: new Date(),
+            user: req.user.username
+        });
+        
+        res.json({ 
+            success: true, 
+            message: 'Custom announcement sent successfully',
+            data: {
+                message: message.trim(),
+                windowNumber: parseInt(windowNumber),
+                type: type
+            }
+        });
+        
+    } catch (error) {
+        console.error('💥 Error in custom announcement endpoint:', error);
+        res.status(500).json({ 
+            error: 'Internal server error' 
+        });
+    }
 });
 
 // Graceful shutdown endpoint
