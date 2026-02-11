@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { CONFIG } from '../config/app-config';
-import { getApiUrl } from '../config/api';
-import { useToast } from '../contexts/ToastContext';
-import ConfirmationModal from './ConfirmationModal';
+import { CONFIG } from '../../config/app-config';
+import { getApiUrl } from '../../config/api';
+import { useToast } from '../../contexts/ToastContext';
+import ConfirmationModal from '../ConfirmationModal';
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 
 interface PersonType {

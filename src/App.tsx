@@ -1,11 +1,12 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { useEffect } from 'react';
-import PublicKiosk from './components/PublicKiosk';
-import AdminLogin from './components/AdminLogin';
-import WindowLogin from './components/WindowLogin';
-import AdminDashboard from './components/AdminDashboard';
-import WindowDashboard from './components/WindowDashboard';
-import PublicDisplay from './components/PublicDisplay';
+import PublicKiosk from './components/public/PublicKiosk';
+import AdminLogin from './components/admin/AdminLogin';
+import WindowLogin from './components/window/WindowLogin';
+import AdminDashboard from './components/admin/AdminDashboard';
+import WindowDashboard from './components/window/WindowDashboard';
+import PublicDisplay from './components/public/PublicDisplay';
+import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider } from './contexts/AuthContext';
 import { QueueProvider } from './contexts/QueueContext';
 import { ToastProvider } from './contexts/ToastContext';
@@ -68,9 +69,37 @@ function App() {
                 <Route path="/" element={<PublicKiosk />} />
                 <Route path="/admin/login" element={<AdminLogin />} />
                 <Route path="/window/login" element={<WindowLogin />} />
-                <Route path="/admin/dashboard" element={<AdminDashboard />} />
-                <Route path="/window/dashboard" element={<WindowDashboard />} />
-                <Route path="/window/:windowNumber" element={<WindowDashboard />} />
+                
+                {/* Protected Admin Routes */}
+                <Route 
+                  path="/admin/dashboard" 
+                  element={
+                    <ProtectedRoute requiredRoles={['admin', 'super_admin']} redirectTo="/admin/login">
+                      <AdminDashboard />
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                {/* Protected Window Routes */}
+                <Route 
+                  path="/window/dashboard" 
+                  element={
+                    <ProtectedRoute requiredRoles={['window']} redirectTo="/window/login">
+                      <WindowDashboard />
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                <Route 
+                  path="/window/:windowNumber" 
+                  element={
+                    <ProtectedRoute requiredRoles={['window']} redirectTo="/window/login">
+                      <WindowDashboard />
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                {/* Public Display Route */}
                 <Route path="/display" element={<PublicDisplay />} />
               </Routes>
             </div>

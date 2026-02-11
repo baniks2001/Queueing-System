@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { LockClosedIcon, UserIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 
 // Get superadmin credentials from environment (no fallbacks)
@@ -12,7 +12,7 @@ const AdminLogin: React.FC = () => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const { login } = useAuth();
+  const { login, logout } = useAuth();
   const navigate = useNavigate();
 
   // Handle input changes with superadmin detection
@@ -42,7 +42,16 @@ const AdminLogin: React.FC = () => {
         username.toLowerCase() === SUPERADMIN_USERNAME.toLowerCase() && 
         password === SUPERADMIN_PASSWORD;
       
-      await login(username, password, isSuperAdmin);
+      const result = await login(username, password, isSuperAdmin);
+      
+      // Validate that the user has admin or super_admin role
+      if (result.user.role !== 'admin' && result.user.role !== 'super_admin') {
+        // If not an admin, logout and show error
+        logout();
+        setError('Access denied. This login is for administrators only.');
+        return;
+      }
+      
       navigate('/admin/dashboard');
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -65,7 +74,10 @@ const AdminLogin: React.FC = () => {
             </div>
             <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3 sm:mb-4">Admin Login</h2>
             <p className="text-lg sm:text-xl text-gray-600 mt-2">
-              Administrator Access
+              Administrator Access Only
+            </p>
+            <p className="text-sm sm:text-base text-gray-500 mt-1">
+              Window users should use the Window Login
             </p>
           </div>
 

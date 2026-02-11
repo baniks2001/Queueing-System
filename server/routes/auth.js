@@ -155,4 +155,47 @@ router.post('/super-admin-login', async (req, res) => {
   }
 });
 
+// Token validation endpoint
+router.get('/validate-token', async (req, res) => {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    
+    if (!token) {
+      return res.status(401).json({ valid: false, message: 'No token provided' });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // Check if user still exists and is active
+    let user;
+    if (decoded.role === 'super_admin' && decoded.userId === 'super-admin') {
+      user = { isActive: true };
+    } else if (decoded.role === 'admin' || decoded.role === 'super_admin') {
+      user = await Admin.findById(decoded.userId).select('isActive');
+    } else if (decoded.role === 'window') {
+      user = await User.findById(decoded.userId).select('isActive');
+    }
+    
+    if (!user || !user.isActive) {
+      return res.status(401).json({ valid: false, message: 'User not found or inactive' });
+    }
+    
+    res.json({ 
+      valid: true, 
+      userId: decoded.userId,
+      role: decoded.role,
+      exp: decoded.exp
+    });
+  } catch (error) {
+    console.error('Token validation error:', error);
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ valid: false, message: 'Token expired' });
+    }
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ valid: false, message: 'Invalid token' });
+    }
+    res.status(500).json({ valid: false, message: 'Token validation failed' });
+  }
+});
+
 module.exports = router;

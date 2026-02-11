@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { getApiUrl } from '../config/api';
-import { useToast } from '../contexts/ToastContext';
-import ConfirmationModal from './ConfirmationModal';
+import { getApiUrl } from '../../config/api';
+import { useToast } from '../../contexts/ToastContext';
+import ConfirmationModal from '../ConfirmationModal';
 import {
   UserPlusIcon,
   PencilIcon,

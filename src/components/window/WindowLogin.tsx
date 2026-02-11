@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-
-
+import { useAuth } from '../../contexts/AuthContext';
 
 const WindowLogin: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -13,7 +11,7 @@ const WindowLogin: React.FC = () => {
   const [error, setError] = useState('');
   
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, logout } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,7 +20,15 @@ const WindowLogin: React.FC = () => {
 
     try {
       // Use the auth context login function instead of manual fetch
-      await login(formData.username, formData.password);
+      const result = await login(formData.username, formData.password);
+      
+      // Validate that the user has window role only
+      if (result.user.role !== 'window') {
+        // If not a window user, logout and show error
+        logout();
+        setError('Access denied. This login is for window users only. Please use Admin Login for administrator access.');
+        return;
+      }
       
       // Redirect to window dashboard
       navigate('/window/dashboard');
@@ -59,6 +65,9 @@ const WindowLogin: React.FC = () => {
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             Sign in to access your window dashboard
+          </p>
+          <p className="mt-1 text-center text-xs text-gray-500">
+            Window users only - Admin accounts should use Admin Login
           </p>
         </div>
         

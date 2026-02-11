@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { getApiUrl } from '../config/api';
-import { useToast } from '../contexts/ToastContext';
-import ConfirmationModal from './ConfirmationModal';
+import { getApiUrl } from '../../config/api';
+import { useToast } from '../../contexts/ToastContext';
+import ConfirmationModal from '../ConfirmationModal';
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 
 interface WindowUser {

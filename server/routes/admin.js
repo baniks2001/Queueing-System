@@ -4,54 +4,14 @@ const User = require('../models/User');
 const Service = require('../models/Service');
 const PersonType = require('../models/PersonType');
 const TransactionFlow = require('../models/TransactionFlow');
+const { authMiddleware, requireAdmin } = require('../middleware/auth');
 const router = express.Router();
 
-const authMiddleware = async (req, res, next) => {
-  try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    console.log('Auth middleware - Token:', token ? 'present' : 'missing');
-    
-    if (!token) {
-      return res.status(401).json({ message: 'No token provided' });
-    }
+// Apply authentication middleware to all admin routes
+router.use(authMiddleware);
+router.use(requireAdmin);
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('Auth middleware - Decoded userId:', decoded.userId);
-    console.log('Auth middleware - User role:', decoded.role || 'no role');
-    
-    req.userId = decoded.userId;
-    req.userRole = decoded.role;
-    next();
-  } catch (error) {
-    console.error('Auth middleware error:', error);
-    res.status(401).json({ message: 'Invalid token' });
-  }
-};
-
-const adminMiddleware = async (req, res, next) => {
-  try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    console.log('Admin middleware - Token:', token ? 'present' : 'missing');
-    console.log('Admin middleware - UserId:', req.userId);
-    console.log('Admin middleware - UserRole:', req.userRole);
-    
-    if (!req.userId) {
-      return res.status(401).json({ message: 'No token provided' });
-    }
-    
-    if (req.userId === 'super-admin' || req.userRole === 'admin' || req.userRole === 'super_admin') {
-      return next();
-    }
-    
-    console.log('Admin middleware - Access denied for user:', req.userId, 'role:', req.userRole);
-    return res.status(403).json({ message: 'Admin access required' });
-  } catch (error) {
-    console.error('Admin middleware error:', error);
-    res.status(403).json({ message: 'Admin access required' });
-  }
-};
-
-router.get('/admins', authMiddleware, adminMiddleware, async (req, res) => {
+router.get('/admins', async (req, res) => {
   try {
     const admins = await User.find({ role: { $in: ['admin', 'super_admin'] } })
       .select('-password')
@@ -64,7 +24,7 @@ router.get('/admins', authMiddleware, adminMiddleware, async (req, res) => {
   }
 });
 
-router.post('/admin', authMiddleware, adminMiddleware, async (req, res) => {
+router.post('/admin', async (req, res) => {
   try {
     const { username, password, role } = req.body;
 
@@ -101,7 +61,7 @@ router.post('/admin', authMiddleware, adminMiddleware, async (req, res) => {
   }
 });
 
-router.put('/admin/:id', authMiddleware, adminMiddleware, async (req, res) => {
+router.put('/admin/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { username, role, isActive } = req.body;
@@ -143,7 +103,7 @@ router.put('/admin/:id', authMiddleware, adminMiddleware, async (req, res) => {
   }
 });
 
-router.delete('/admin/:id', authMiddleware, adminMiddleware, async (req, res) => {
+router.delete('/admin/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -165,7 +125,7 @@ router.delete('/admin/:id', authMiddleware, adminMiddleware, async (req, res) =>
   }
 });
 
-router.get('/services', authMiddleware, adminMiddleware, async (req, res) => {
+router.get('/services', async (req, res) => {
   try {
     const services = await Service.find().sort({ name: 1 });
     res.json(services);
@@ -185,7 +145,7 @@ router.get('/public/services', async (req, res) => {
   }
 });
 
-router.post('/service', authMiddleware, adminMiddleware, async (req, res) => {
+router.post('/service', async (req, res) => {
   try {
     const { name, description, prefix, windowFlow } = req.body;
 
@@ -216,7 +176,7 @@ router.post('/service', authMiddleware, adminMiddleware, async (req, res) => {
   }
 });
 
-router.put('/service/:id', authMiddleware, adminMiddleware, async (req, res) => {
+router.put('/service/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { name, description, prefix, windowFlow, isActive } = req.body;
@@ -251,7 +211,7 @@ router.put('/service/:id', authMiddleware, adminMiddleware, async (req, res) => 
   }
 });
 
-router.delete('/service/:id', authMiddleware, adminMiddleware, async (req, res) => {
+router.delete('/service/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -264,7 +224,7 @@ router.delete('/service/:id', authMiddleware, adminMiddleware, async (req, res) 
   }
 });
 
-router.get('/person-types', authMiddleware, adminMiddleware, async (req, res) => {
+router.get('/person-types', async (req, res) => {
   try {
     const personTypes = await PersonType.find().sort({ priority: -1, name: 1 });
     res.json(personTypes);
@@ -285,7 +245,7 @@ router.get('/person-types/public', async (req, res) => {
   }
 });
 
-router.post('/person-type', authMiddleware, adminMiddleware, async (req, res) => {
+router.post('/person-type', async (req, res) => {
   try {
     const { name, description, priority, color } = req.body;
 
@@ -313,7 +273,7 @@ router.post('/person-type', authMiddleware, adminMiddleware, async (req, res) =>
   }
 });
 
-router.put('/person-type/:id', authMiddleware, adminMiddleware, async (req, res) => {
+router.put('/person-type/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { name, description, priority, color, isActive } = req.body;
@@ -348,7 +308,7 @@ router.put('/person-type/:id', authMiddleware, adminMiddleware, async (req, res)
   }
 });
 
-router.delete('/person-type/:id', authMiddleware, adminMiddleware, async (req, res) => {
+router.delete('/person-type/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -376,7 +336,7 @@ router.get('/public/transaction-flows', async (req, res) => {
 
 // Transaction Flow Routes
 // GET all transaction flows
-router.get('/transaction-flows', authMiddleware, adminMiddleware, async (req, res) => {
+router.get('/transaction-flows', async (req, res) => {
   try {
     console.log('=== Fetching transaction flows ===');
     console.log('🔍 Querying database...');
@@ -391,7 +351,7 @@ router.get('/transaction-flows', authMiddleware, adminMiddleware, async (req, re
 });
 
 // POST create transaction flow
-router.post('/transaction-flow', authMiddleware, adminMiddleware, async (req, res) => {
+router.post('/transaction-flow', async (req, res) => {
   try {
     console.log('=== Creating transaction flow ===');
     console.log('Request body:', req.body);
@@ -452,7 +412,7 @@ router.post('/transaction-flow', authMiddleware, adminMiddleware, async (req, re
 });
 
 // PUT update transaction flow
-router.put('/transaction-flow/:id', authMiddleware, adminMiddleware, async (req, res) => {
+router.put('/transaction-flow/:id', async (req, res) => {
   try {
     console.log('Updating transaction flow:', req.params.id, req.body);
     const { name, description, prefix, steps } = req.body;
@@ -512,7 +472,7 @@ router.put('/transaction-flow/:id', authMiddleware, adminMiddleware, async (req,
 });
 
 // DELETE transaction flow
-router.delete('/transaction-flow/:id', authMiddleware, adminMiddleware, async (req, res) => {
+router.delete('/transaction-flow/:id', async (req, res) => {
   try {
     console.log('Deleting transaction flow:', req.params.id);
     const transactionFlow = await TransactionFlow.findByIdAndDelete(req.params.id);

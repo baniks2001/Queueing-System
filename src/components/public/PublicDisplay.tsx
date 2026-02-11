@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useQueue } from '../contexts/QueueContext';
+import { useQueue } from '../../contexts/QueueContext';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { getApiUrl, getUploadUrl } from '../config/api';
+import { getApiUrl, getUploadUrl } from '../../config/api';
 import { io } from 'socket.io-client';
 import {
   ArrowLeftIcon,
@@ -24,6 +24,7 @@ const PublicDisplay: React.FC = () => {
   const [repeatAnnouncementTracker, setRepeatAnnouncementTracker] = useState<Set<string>>(new Set());
   const [windowUsers, setWindowUsers] = useState<any[]>([]);
   const [onHoldQueues, setOnHoldQueues] = useState<any[]>([]);
+  const [lastTableRefresh, setLastTableRefresh] = useState<Date>(new Date());
   const navigate = useNavigate();
 
   // Fetch window users from database
@@ -46,6 +47,8 @@ const PublicDisplay: React.FC = () => {
         console.log('✅ On-hold queues response for PublicDisplay:', data);
         console.log(`📊 On-hold queues length: ${data.length}`);
         setOnHoldQueues(data);
+        setLastTableRefresh(new Date());
+        console.log('🔄 On-hold queues refreshed at:', new Date().toLocaleTimeString());
       } else {
         console.error(`❌ On-hold queues failed for PublicDisplay with status:`, response.status);
         setOnHoldQueues([]);
@@ -61,6 +64,8 @@ const PublicDisplay: React.FC = () => {
       const response = await axios.get(getApiUrl('/api/users/window-users/public'));
       if (response.data) {
         setWindowUsers(response.data);
+        setLastTableRefresh(new Date());
+        console.log('🔄 Window users refreshed at:', new Date().toLocaleTimeString());
       }
     } catch (error) {
       console.error('Error fetching window users:', error);
@@ -208,12 +213,24 @@ const PublicDisplay: React.FC = () => {
     fetchKioskTitle();
     fetchWindowUsers();
     fetchOnHoldQueues();
-    const interval = setInterval(() => {
-      fetchKioskTitle();
+    
+    // Only refresh table data, not the entire system
+    const tablesInterval = setInterval(() => {
+      console.log('🔄 Refreshing tables only...');
       fetchWindowUsers();
       fetchOnHoldQueues();
-    }, 30000);
-    return () => clearInterval(interval);
+    }, 5000); // Refresh tables every 5 seconds
+    
+    // Refresh kiosk title less frequently
+    const titleInterval = setInterval(() => {
+      console.log('🔄 Refreshing kiosk title...');
+      fetchKioskTitle();
+    }, 30000); // Refresh title every 30 seconds
+    
+    return () => {
+      clearInterval(tablesInterval);
+      clearInterval(titleInterval);
+    };
   }, []);
 
   // Test immediate call
@@ -337,17 +354,12 @@ const PublicDisplay: React.FC = () => {
         setKioskTitle(response.data.title || 'Queue Management System');
         setGovernmentOfficeName(response.data.governmentOfficeName || 'Government Office');
         setLogo(response.data.logo || null);
+        console.log('🔄 Kiosk title refreshed at:', new Date().toLocaleTimeString());
       }
     } catch (error) {
       console.error('Error fetching kiosk title:', error);
     }
   };
-
-  useEffect(() => {
-    fetchKioskTitle();
-    const interval = setInterval(fetchKioskTitle, 30000);
-    return () => clearInterval(interval);
-  }, []);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -498,9 +510,14 @@ const PublicDisplay: React.FC = () => {
             {/* Left Side - Window Status */}
             <div className="flex-1">
               <div className="bg-white rounded-xl p-4 sm:p-6 lg:p-8 shadow-xl border border-gray-200 h-full overflow-hidden">
-                <h3 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-4 sm:mb-6 flex items-center text-slate-800">
-                  <UserGroupIcon className="w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10 mr-4 sm:mr-5 text-blue-600" />
-                  Window Status
+                <h3 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-4 sm:mb-6 flex items-center justify-between text-slate-800">
+                  <div className="flex items-center">
+                    <UserGroupIcon className="w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10 mr-4 sm:mr-5 text-blue-600" />
+                    Window Status
+                  </div>
+                  <div className="text-xs text-gray-400 font-normal">
+                    Last: {lastTableRefresh.toLocaleTimeString()}
+                  </div>
                 </h3>
                 
                 {/* Dynamic Window Status - Show windows from database */}
@@ -751,9 +768,12 @@ const PublicDisplay: React.FC = () => {
                 
                 {/* Label Below Table */}
                 <div className="text-center mt-2 text-slate-600">
-                  <h4 className="text-xs sm:text-sm lg:text-sm font-bold uppercase tracking-wide">
+                  <h4 className="text-xs sm:text-sm lg:text-sm font-bold uppercase tracking-wide flex items-center justify-center">
                     <UserGroupIcon className="w-3 h-3 sm:w-4 sm:h-4 lg:w-5 lg:h-5 mr-1 text-blue-600" />
                     Current Queue Numbers
+                    <span className="ml-2 text-xs text-gray-400 font-normal">
+                      ({lastTableRefresh.toLocaleTimeString()})
+                    </span>
                   </h4>
                 </div>
                 
@@ -878,9 +898,12 @@ const PublicDisplay: React.FC = () => {
                 
                 {/* Label Below Table */}
                 <div className="text-center mt-2 text-slate-600">
-                  <h4 className="text-xs sm:text-sm lg:text-sm font-bold uppercase tracking-wide">
+                  <h4 className="text-xs sm:text-sm lg:text-sm font-bold uppercase tracking-wide flex items-center justify-center">
                     <UserGroupIcon className="w-3 h-3 sm:w-4 sm:h-4 lg:w-5 lg:h-5 mr-1 text-orange-600" />
                     On Hold Queue Numbers
+                    <span className="ml-2 text-xs text-gray-400 font-normal">
+                      ({lastTableRefresh.toLocaleTimeString()})
+                    </span>
                   </h4>
                 </div>
                 

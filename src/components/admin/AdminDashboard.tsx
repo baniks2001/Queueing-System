@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { useToast } from '../contexts/ToastContext';
-import { getApiUrl, getUploadUrl } from '../config/api';
-import ConfirmationModal from './ConfirmationModal';
+import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
+import { getApiUrl, getUploadUrl } from '../../config/api';
+import ConfirmationModal from '../ConfirmationModal';
 import {
   QueueListIcon,
   TicketIcon,

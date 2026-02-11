@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { getApiUrl } from '../config/api';
+import { getApiUrl } from '../../config/api';
 import {
   ArrowRightOnRectangleIcon,
   PlayIcon,
@@ -129,7 +129,7 @@ export default function WindowDashboard() {
       
       return () => clearInterval(interval);
     }
-  }, [user, isCalling]);
+  }, [user, isCalling, fetchCurrentQueue, fetchNextQueues, fetchOnHoldQueues]);
 
   const fetchCurrentQueue = useCallback(async () => {
     try {
@@ -282,31 +282,6 @@ export default function WindowDashboard() {
     }
   };
 
-  // Set up data fetching when user is available
-  useEffect(() => {
-    console.log('Window Dashboard - User object:', user);
-    console.log('Window Dashboard - User windowNumber:', user?.windowNumber);
-    
-    // Only fetch queues if user is available and has a windowNumber
-    if (user && user.windowNumber) {
-      fetchCurrentQueue();
-      fetchNextQueues();
-      fetchOnHoldQueues();
-      
-      // Set up periodic refresh for data only
-      const interval = setInterval(() => {
-        // Only refresh if not currently calling to avoid conflicts
-        if (!isCalling) {
-          fetchCurrentQueue();
-          fetchNextQueues();
-          fetchOnHoldQueues();
-        }
-      }, 3000); // Refresh every 3 seconds for better responsiveness
-      
-      return () => clearInterval(interval);
-    }
-  }, [user, isCalling, fetchCurrentQueue, fetchNextQueues, fetchOnHoldQueues]);
-
   const handleServeOnHold = async (queueId: string) => {
     if (isCalling) return;
     
@@ -424,26 +399,123 @@ export default function WindowDashboard() {
     }
   };
 
+  // Local window-specific announcement (only plays in this window)
+  const playLocalAnnouncement = (queueNumber: string, windowNumber: number) => {
+    console.log(`🔊 Playing local announcement for Window ${windowNumber}: Queue ${queueNumber}`);
+    
+    // Type definitions for speech synthesis API
+    interface SpeechSynthesisVoice {
+      name: string;
+      lang: string;
+    }
+    
+    interface SpeechSynthesisUtterance {
+      rate: number;
+      pitch: number;
+      volume: number;
+      lang?: string;
+      voice?: SpeechSynthesisVoice;
+      text: string;
+    }
+    
+    interface SpeechSynthesis {
+      getVoices(): SpeechSynthesisVoice[];
+      speak(utterance: SpeechSynthesisUtterance): void;
+    }
+    
+    interface ExtendedWindow extends Window {
+      speechSynthesis?: SpeechSynthesis;
+      webkitSpeechSynthesis?: SpeechSynthesis;
+      mozSpeechSynthesis?: SpeechSynthesis;
+      msSpeechSynthesis?: SpeechSynthesis;
+      SpeechSynthesisUtterance?: new (text: string) => SpeechSynthesisUtterance;
+      webkitSpeechSynthesisUtterance?: new (text: string) => SpeechSynthesisUtterance;
+      mozSpeechSynthesisUtterance?: new (text: string) => SpeechSynthesisUtterance;
+      msSpeechSynthesisUtterance?: new (text: string) => SpeechSynthesisUtterance;
+    }
+    
+    const extendedWindow = window as ExtendedWindow;
+    const SpeechSynthesis = extendedWindow.speechSynthesis || extendedWindow.webkitSpeechSynthesis || extendedWindow.mozSpeechSynthesis || extendedWindow.msSpeechSynthesis;
+    
+    if (SpeechSynthesis) {
+      try {
+        // Create speech synthesis utterance with cross-browser support
+        const UtteranceConstructor = extendedWindow.SpeechSynthesisUtterance || extendedWindow.webkitSpeechSynthesisUtterance || extendedWindow.mozSpeechSynthesisUtterance || extendedWindow.msSpeechSynthesisUtterance;
+        
+        if (!UtteranceConstructor) {
+          throw new Error('SpeechSynthesisUtterance not available');
+        }
+        
+        const utterance = new UtteranceConstructor(
+          `Now serving number ${queueNumber} at Window ${windowNumber}`
+        );
+        
+        // Set utterance properties with fallbacks
+        utterance.rate = 0.9;
+        utterance.pitch = 1;
+        utterance.volume = 1;
+        
+        // Cross-browser specific properties
+        if ('lang' in utterance) {
+          utterance.lang = 'en-US';
+        }
+        if ('voice' in utterance) {
+          // Try to use a female voice if available
+          const voices = SpeechSynthesis.getVoices();
+          const femaleVoice = voices.find((voice: SpeechSynthesisVoice) => 
+            voice.name.includes('Female') || voice.name.includes('female')
+          );
+          if (femaleVoice) {
+            utterance.voice = femaleVoice;
+          }
+        }
+        
+        // Speak announcement locally only
+        SpeechSynthesis.speak(utterance);
+        
+        console.log(`🔊 Local announcement played for Window ${windowNumber}: Queue ${queueNumber}`);
+        
+      } catch (error) {
+        console.error(`💥 Local speech synthesis error: ${error}`);
+        console.log(`🔇 Silent local announcement logged: ${queueNumber} at Window ${windowNumber}`);
+      }
+    } else {
+      console.log(`🔇 Speech synthesis not available, silent local announcement logged: ${queueNumber} at Window ${windowNumber}`);
+    }
+  };
+
   const repeatAnnouncement = async () => {
     try {
       const windowNumber = user?.windowNumber;
       
       if (!windowNumber) {
-        console.log('No window number available, skipping repeat announcement');
+        console.log('❌ No window number available, skipping repeat announcement');
         return;
       }
       
       if (!currentQueue) {
-        console.log('No current queue available, skipping repeat announcement');
+        console.log('❌ No current queue available, skipping repeat announcement');
         return;
       }
       
-      console.log(`🔄 Triggering repeat announcement for Window ${windowNumber} - Queue: ${currentQueue.queueNumber}`);
+      // Only announce if queue is currently being served at THIS window
+      if (currentQueue.status !== 'serving') {
+        console.log(`❌ Queue ${currentQueue.queueNumber} is not currently serving (status: ${currentQueue.status}), skipping announcement`);
+        return;
+      }
+      
+      // Ensure the queue belongs to this window
+      if (currentQueue.currentWindow !== windowNumber) {
+        console.log(`❌ Queue ${currentQueue.queueNumber} belongs to Window ${currentQueue.currentWindow}, but this is Window ${windowNumber}, skipping announcement`);
+        return;
+      }
+      
+      console.log(`🔄 Manual repeat announcement triggered for Window ${windowNumber} - Queue: ${currentQueue.queueNumber} (PUBLIC DISPLAY + LOCAL)`);
       
       // Get authentication token from localStorage
       const token = localStorage.getItem('token');
       
-      // Call API to announce current serving queue 1 time only
+      // 1. Trigger announcement in PublicDisplay (for public to hear) - 1 time only
       const response = await safeFetch(getApiUrl(`/api/queue/repeat-announcement/${windowNumber}`), {
         method: 'POST',
         headers: {
@@ -453,17 +525,32 @@ export default function WindowDashboard() {
         body: JSON.stringify({
           queueNumber: currentQueue.queueNumber,
           windowNumber: windowNumber,
-          announceOnce: true // Flag to announce only 1 time
+          announceOnce: true // Flag to announce only 1 time in PublicDisplay
         })
       });
 
       if (response.ok) {
-        console.log('✅ Repeat announcement triggered successfully');
+        console.log(`✅ PublicDisplay announcement triggered successfully for Window ${windowNumber} (1 time only)`);
+        
+        // 2. Play local announcement in this window dashboard (for operator to hear)
+        setTimeout(() => {
+          playLocalAnnouncement(currentQueue.queueNumber, windowNumber);
+        }, 500); // Small delay to avoid overlap with PublicDisplay announcement
+        
       } else {
-        console.error('❌ Repeat announcement failed with status:', response.status);
+        console.error('❌ PublicDisplay announcement failed with status:', response.status);
+        
+        // Still play local announcement even if API fails
+        playLocalAnnouncement(currentQueue.queueNumber, windowNumber);
       }
+      
     } catch (error) {
       console.error(`💥 Error triggering repeat announcement for Window ${user?.windowNumber}:`, error);
+      
+      // Still play local announcement even if API fails
+      if (currentQueue && user?.windowNumber) {
+        playLocalAnnouncement(currentQueue.queueNumber, user.windowNumber);
+      }
     }
   };
 

@@ -69,7 +69,7 @@ router.post('/admin-user', authMiddleware, adminMiddleware, async (req, res) => 
   try {
     const { username, password, role, windowNumber, service } = req.body;
 
-    console.log('Creating admin/table user:', { username, role, windowNumber, service });
+    console.log('Creating admin user:', { username, role, windowNumber, service });
 
     const existingUser = await User.findOne({ username });
 
@@ -78,16 +78,16 @@ router.post('/admin-user', authMiddleware, adminMiddleware, async (req, res) => 
     }
 
     // Validate required fields based on role
-    if ((role === 'window' || role === 'table') && (!windowNumber || !service)) {
-      return res.status(400).json({ message: 'Window/Table number and service are required for window/table users' });
+    if (role === 'window' && (!windowNumber || !service)) {
+      return res.status(400).json({ message: 'Window number and service are required for window users' });
     }
 
     const newUser = new User({
       username,
       password, // Will be hashed by pre-save middleware
       role: role || 'admin',
-      windowNumber: role === 'window' || role === 'table' ? windowNumber : undefined,
-      service: role === 'window' || role === 'table' ? service : undefined
+      windowNumber: role === 'window' ? windowNumber : undefined,
+      service: role === 'window' ? service : undefined
     });
 
     await newUser.save();

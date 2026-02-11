@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   TicketIcon, 
@@ -46,6 +46,8 @@ const PublicKiosk: React.FC = () => {
   const [personTypes, setPersonTypes] = useState<PersonType[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
+  const [forceUpdate, setForceUpdate] = useState(0);
   const navigate = useNavigate();
 
   // Test navigation on component mount
@@ -67,7 +69,7 @@ const PublicKiosk: React.FC = () => {
   };
 
   // Fetch transaction flows from backend
-  const fetchTransactionFlows = async () => {
+  const fetchTransactionFlows = useCallback(async () => {
     try {
       const response = await fetch(getApiUrl('/api/transaction-flows/public'));
       if (response.ok) {
@@ -82,10 +84,10 @@ const PublicKiosk: React.FC = () => {
       console.error('Error fetching transaction flows:', error);
       setTransactionFlows([]);
     }
-  };
+  }, []);
 
   // Fetch person types from backend
-  const fetchPersonTypes = async () => {
+  const fetchPersonTypes = useCallback(async () => {
     try {
       const response = await fetch(getApiUrl('/api/admin/person-types/public'));
       if (response.ok) {
@@ -100,10 +102,10 @@ const PublicKiosk: React.FC = () => {
       console.error('Error fetching person types:', error);
       setPersonTypes([]);
     }
-  };
+  }, []);
 
   // Fetch kiosk status from backend
-  const fetchKioskStatus = async () => {
+  const fetchKioskStatus = useCallback(async () => {
     try {
       const response = await fetch(getApiUrl('/api/kiosk/status'));
       if (response.ok) {
@@ -123,7 +125,7 @@ const PublicKiosk: React.FC = () => {
       // Set default status if API fails
       setKioskStatus({ isOpen: false, title: 'Queue Management System', governmentOfficeName: 'Government Office', logo: undefined, status: 'closed' });
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchTransactionFlows();
@@ -141,6 +143,34 @@ const PublicKiosk: React.FC = () => {
       clearInterval(timeInterval);
     };
   }, [fetchKioskStatus, fetchPersonTypes, fetchTransactionFlows]);
+
+  // Cooldown timer effect
+  useEffect(() => {
+    if (cooldownRemaining > 0) {
+      const timer = setTimeout(() => {
+        setCooldownRemaining(prev => {
+          const newValue = prev - 1;
+          console.log('Cooldown tick:', newValue);
+          
+          // Force a complete re-render when cooldown reaches 0
+          if (newValue === 0) {
+            setForceUpdate(prev => prev + 1);
+            console.log('Cooldown ended, forcing re-render');
+          }
+          
+          return newValue;
+        });
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [cooldownRemaining]);
+
+  // Cleanup cooldown on component unmount
+  useEffect(() => {
+    return () => {
+      setCooldownRemaining(0);
+    };
+  }, []);
 
   const handleGenerateQueue = async () => {
     if (!selectedTransaction) {
@@ -169,6 +199,11 @@ const PublicKiosk: React.FC = () => {
         const queueData = data.queue || data; // Some APIs wrap in queue object
         console.log('Queue data:', queueData);
         setGeneratedQueue(queueData);
+        // Start 5-second cooldown
+        setCooldownRemaining(5);
+        // Unselect transaction and person type after successful generation
+        setSelectedTransaction('');
+        setSelectedPersonType('');
       } else {
         console.error('Failed to generate queue:', response.statusText);
         alert('Failed to generate queue. Please try again.');
@@ -497,13 +532,23 @@ const PublicKiosk: React.FC = () => {
               <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-300 p-4 sm:p-6">
                 <button
                   onClick={handleGenerateQueue}
-                  disabled={!selectedTransaction || isGenerating}
-                  className="w-full py-4 sm:py-6 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105 disabled:hover:scale-100 font-semibold text-base sm:text-lg shadow-lg"
+                  disabled={!selectedTransaction || isGenerating || cooldownRemaining > 0}
+                  key={forceUpdate} // Force re-render when cooldown ends
+                  className={`w-full py-4 sm:py-6 text-white rounded-xl transition-all duration-300 transform hover:scale-105 disabled:hover:scale-100 font-semibold text-base sm:text-lg shadow-lg ${
+                    !selectedTransaction || isGenerating || cooldownRemaining > 0
+                      ? 'bg-gradient-to-r from-gray-400 to-gray-500 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
+                  }`}
                 >
                   {isGenerating ? (
                     <div className="flex items-center justify-center">
                       <div className="animate-spin rounded-full h-5 w-5 sm:h-6 sm:w-6 border-b-2 border-white mr-3"></div>
                       Generating Queue Number...
+                    </div>
+                  ) : cooldownRemaining > 0 ? (
+                    <div className="flex items-center justify-center">
+                      <ClockIcon className="w-5 h-5 sm:w-6 sm:h-6 mr-3" />
+                      Please wait {cooldownRemaining} second{cooldownRemaining !== 1 ? 's' : ''}...
                     </div>
                   ) : (
                     <div className="flex items-center justify-center">
@@ -515,7 +560,7 @@ const PublicKiosk: React.FC = () => {
                 
                 {/* Status Display */}
                 <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-gray-50 rounded-xl">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 text-sm">
                     <div className="flex items-center space-x-2">
                       <span className="text-gray-600">Selected:</span>
                       <span className="font-medium text-gray-900">{selectedTransaction || 'None'}</span>
@@ -523,6 +568,10 @@ const PublicKiosk: React.FC = () => {
                     <div className="flex items-center space-x-2">
                       <span className="text-gray-600">Type:</span>
                       <span className="font-medium text-gray-900">{selectedPersonType}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-gray-600">Cooldown:</span>
+                      <span className="font-medium text-gray-900">{cooldownRemaining}s</span>
                     </div>
                   </div>
                 </div>
