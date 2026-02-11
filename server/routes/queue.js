@@ -923,6 +923,44 @@ router.post('/serve-on-hold/:queueId', authMiddleware, async (req, res) => {
   }
 });
 
+// Delete on-hold queue
+router.delete('/delete-on-hold/:queueId', authMiddleware, async (req, res) => {
+  try {
+    const { queueId } = req.params;
+    
+    console.log(`🗑️ Delete on-hold request: queueId=${queueId}`);
+    
+    // Find on-hold queue
+    const onHoldQueue = await OnHoldQueue.findById(queueId);
+    if (!onHoldQueue) {
+      console.log(`❌ On-hold queue not found: ${queueId}`);
+      return res.status(404).json({ message: 'On-hold queue not found' });
+    }
+    
+    // Find original queue
+    const originalQueue = await Queue.findById(onHoldQueue.originalQueueId);
+    if (originalQueue) {
+      // Delete the original queue as well
+      await Queue.findByIdAndDelete(onHoldQueue.originalQueueId);
+      console.log(`🗑️ Deleted original queue: ${originalQueue.queueNumber}`);
+    }
+    
+    // Delete on-hold record
+    await OnHoldQueue.findByIdAndDelete(queueId);
+    console.log(`🗑️ Deleted on-hold record: ${onHoldQueue.queueNumber}`);
+    
+    console.log(`✅ Successfully deleted on-hold queue ${onHoldQueue.queueNumber}`);
+    
+    res.json({ 
+      message: 'On-hold queue deleted successfully',
+      deletedQueue: onHoldQueue.queueNumber
+    });
+  } catch (error) {
+    console.error('Delete on-hold queue error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Reset all on-hold queues
 router.post('/reset-on-hold', async (req, res) => {
   try {

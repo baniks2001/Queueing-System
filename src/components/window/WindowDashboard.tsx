@@ -3,12 +3,14 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { getApiUrl } from '../../config/api';
 import { io } from 'socket.io-client';
+import ConfirmationModal from '../ConfirmationModal';
 import {
   ArrowRightOnRectangleIcon,
   PlayIcon,
   UserGroupIcon,
   SpeakerWaveIcon,
-  MicrophoneIcon
+  MicrophoneIcon,
+  TrashIcon
 } from '@heroicons/react/24/outline';
 
 // Cross-browser compatibility utilities
@@ -111,6 +113,11 @@ export default function WindowDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [customMessage, setCustomMessage] = useState('');
   const [isAnnouncing, setIsAnnouncing] = useState(false);
+  const [deleteModal, setDeleteModal] = useState({
+    isOpen: false,
+    queueId: '',
+    queueNumber: ''
+  });
 
   useEffect(() => {
     console.log('Window Dashboard - User object:', user);
@@ -396,6 +403,57 @@ export default function WindowDashboard() {
     } finally {
       setIsCalling(false);
     }
+  };
+
+  const handleDeleteOnHold = async (queueId: string, queueNumber: string) => {
+    if (isCalling) return;
+    
+    // Open modern confirmation modal
+    setDeleteModal({
+      isOpen: true,
+      queueId,
+      queueNumber
+    });
+  };
+
+  const confirmDeleteOnHold = async () => {
+    if (!deleteModal.queueId) return;
+    
+    setIsCalling(true);
+    try {
+      console.log(`🗑️ Deleting on-hold queue ${deleteModal.queueId}`);
+      
+      const response = await fetch(getApiUrl(`/api/queue/delete-on-hold/${deleteModal.queueId}`), {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`✅ On-hold queue deleted successfully:`, data);
+        
+        // Refresh on-hold queues
+        fetchOnHoldQueues();
+        
+        console.log(`🎉 Successfully deleted on-hold queue ${data.deletedQueue}`);
+      } else {
+        console.error(`❌ Delete on-hold failed with status:`, response.status);
+        console.error('Delete on-hold failed response:', await response.text());
+      }
+    } catch (error) {
+      console.error(`💥 Error deleting on-hold queue:`, error);
+    } finally {
+      setIsCalling(false);
+      // Close modal
+      setDeleteModal({ isOpen: false, queueId: '', queueNumber: '' });
+    }
+  };
+
+  const cancelDeleteOnHold = () => {
+    setDeleteModal({ isOpen: false, queueId: '', queueNumber: '' });
   };
 
   const handleNextQueue = async () => {
@@ -1003,23 +1061,41 @@ return (
                               </div>
                             </td>
                             <td className="py-2 px-3">
-                              <button
-                                onClick={() => handleServeOnHold(queue._id)}
-                                disabled={isCalling}
-                                className="bg-orange-600 text-white py-1 px-3 rounded text-sm font-medium hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center"
-                              >
-                                {isCalling ? (
-                                  <>
-                                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2"></div>
-                                    <span>...</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <PlayIcon className="h-3 w-3 mr-1" />
-                                    <span>Serve</span>
-                                  </>
-                                )}
-                              </button>
+                              <div className="flex space-x-2">
+                                <button
+                                  onClick={() => handleServeOnHold(queue._id)}
+                                  disabled={isCalling}
+                                  className="bg-orange-600 text-white py-1 px-3 rounded text-sm font-medium hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center"
+                                >
+                                  {isCalling ? (
+                                    <>
+                                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2"></div>
+                                      <span>...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <PlayIcon className="h-3 w-3 mr-1" />
+                                      <span>Serve</span>
+                                    </>
+                                  )}
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteOnHold(queue._id, queue.queueNumber)}
+                                  disabled={isCalling}
+                                  className="bg-red-600 text-white py-1 px-2 rounded text-sm font-medium hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center"
+                                  title="Delete this on-hold queue"
+                                >
+                                  {isCalling ? (
+                                    <>
+                                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <TrashIcon className="h-3 w-3" />
+                                    </>
+                                  )}
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -1042,6 +1118,18 @@ return (
           </div>
         </div>
       </div>
+      
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={deleteModal.isOpen}
+        onClose={cancelDeleteOnHold}
+        onConfirm={confirmDeleteOnHold}
+        title="Delete On-Hold Queue"
+        message={`Are you sure you want to delete queue number ${deleteModal.queueNumber}? This action cannot be undone and will permanently remove this queue from the system.`}
+        confirmText="Delete Queue"
+        cancelText="Cancel"
+        type="danger"
+      />
     </div>
   );
 }
