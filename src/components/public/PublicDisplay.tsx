@@ -564,10 +564,10 @@ const PublicDisplay: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 safe-area">
       {/* Top Bar - Dark Blue */}
-      <div className="bg-blue-800 shadow-lg border-b border-blue-700 fixed top-0 left-0 right-0 z-50">
-        <div className="container mx-auto max-w-7xl px-2 sm:px-3 py-1">
+      <div className="bg-blue-800 shadow-lg border-b border-blue-700 fixed top-0 left-0 right-0 z-50 safe-area-top">
+        <div className="container mx-auto max-w-7xl px-2 sm:px-3 py-1 tv-optimized">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               {/* Logo */}
@@ -584,11 +584,11 @@ const PublicDisplay: React.FC = () => {
               )}
               
               {/* Government Office Name and Title */}
-              <div>
+              <div className="tv-optimized">
                 <div className="text-xs text-blue-100">
                   {governmentOfficeName}
                 </div>
-                <h1 className="text-xs sm:text-sm lg:text-lg font-bold text-white">
+                <h1 className="text-xs sm:text-sm lg:text-lg font-bold text-white tv-optimized">
                   {kioskTitle}
                 </h1>
                 {/* Connection Status Indicator */}
@@ -612,7 +612,7 @@ const PublicDisplay: React.FC = () => {
             
             <div className="flex items-center space-x-4">
               {/* Date and Time - Responsive */}
-              <div className="flex items-center space-x-2 text-white">
+              <div className="flex items-center space-x-2 text-white tv-optimized">
                 <ClockIcon className="w-3 h-3 sm:w-3 sm:h-3 lg:w-4 lg:h-4" />
                 <div className="text-right">
                   <div className="text-xs font-bold">
@@ -630,7 +630,9 @@ const PublicDisplay: React.FC = () => {
               <div className="relative">
                 <button
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="p-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  className="p-2 rounded-lg hover:bg-blue-700 transition-colors touch-manipulation active-scale"
+                  aria-label="Settings menu"
+                  aria-expanded={isDropdownOpen}
                 >
                   <CogIcon className="w-3 h-3 sm:w-4 sm:h-4 lg:w-5 lg:h-5 text-white" />
                 </button>

@@ -317,10 +317,10 @@ const PublicKiosk: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 safe-area">
       {/* Modern Header - Dark Blue */}
-      <header className="bg-blue-800 shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8">
+      <header className="bg-blue-800 shadow-sm border-b border-gray-200 safe-area-top">
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 tv-optimized">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center py-3 sm:py-4 space-y-3 sm:space-y-0">
             {/* System Title */}
             <div className="flex items-center space-x-3">
@@ -338,8 +338,8 @@ const PublicKiosk: React.FC = () => {
               )}
               
               {/* Government Office Name */}
-              <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-white">
+              <div className="tv-optimized">
+                <h1 className="text-xl sm:text-2xl font-bold text-white tv-optimized">
                   {kioskStatus?.governmentOfficeName || 'Government Office'}
                 </h1>
                 {kioskStatus && (
@@ -367,7 +367,7 @@ const PublicKiosk: React.FC = () => {
 
             <div className="flex items-center space-x-4">
               {/* Date and Time */}
-              <div className="flex items-center space-x-2 text-white">
+              <div className="flex items-center space-x-2 text-white tv-optimized">
                 <ClockIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                 <div className="text-right">
                   <div className="text-sm sm:text-base font-bold">
@@ -385,7 +385,9 @@ const PublicKiosk: React.FC = () => {
               <div className="relative">
                 <button
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="flex items-center px-3 py-2 sm:px-4 sm:py-2 bg-blue-700 hover:bg-blue-600 text-white rounded-lg transition-all duration-200 text-sm"
+                  className="flex items-center px-3 py-2 sm:px-4 sm:py-2 bg-blue-700 hover:bg-blue-600 text-white rounded-lg transition-all duration-200 text-sm touch-manipulation active-scale"
+                  aria-label="Settings menu"
+                  aria-expanded={isDropdownOpen}
                 >
                   <CogIcon className="w-4 h-4 sm:w-5 sm:h-5" />
                   <ChevronDownIcon className="w-4 h-4 sm:w-5 sm:h-5 ml-2" />

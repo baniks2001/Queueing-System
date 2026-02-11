@@ -1,0 +1,4 @@
+# Ignore CSS files from ESLint to prevent Tailwind directive warnings
+src/index.css
+src/App.css
+**/*.css

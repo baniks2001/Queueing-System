@@ -722,10 +722,10 @@ if (!user || !user.windowNumber) {
 }
 
 return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 safe-area">
       {/* Header - Fixed Position Mobile */}
-      <div className="bg-blue-600 shadow-md border-b border-blue-700 fixed top-0 left-0 right-0 z-50">
-        <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8">
+      <div className="bg-blue-600 shadow-md border-b border-blue-700 fixed top-0 left-0 right-0 z-50 safe-area-top">
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 tv-optimized">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-3">
               <h1 className="text-lg sm:text-xl font-semibold text-white">
@@ -746,7 +746,8 @@ return (
               </span>
               <button
                 onClick={handleLogout}
-                className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 touch-manipulation active-scale"
+                aria-label="Logout from window dashboard"
               >
                 <ArrowRightOnRectangleIcon className="h-4 w-4 mr-2" />
                 <span className="hidden sm:inline">Logout</span>
@@ -756,12 +757,12 @@ return (
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 pt-20 sm:pt-24 lg:pt-28 min-h-screen">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 pt-20 sm:pt-24 lg:pt-28 min-h-screen safe-area-bottom">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 tv-optimized">
           
           {/* Currently Serving - Left Side */}
           <div className="flex flex-col space-y-4">
-            <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 lg:p-8">
+            <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 lg:p-8 tv-card high-contrast respect-motion">
               <div className="text-center">
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">
                   Currently Serving

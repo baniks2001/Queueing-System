@@ -2,6 +2,71 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Smart TV Optimizations */
+@media (min-width: 1920px) and (orientation: landscape) {
+  .tv-optimized {
+    font-size: 1.5rem;
+    padding: 2rem;
+    line-height: 1.8;
+  }
+  
+  .tv-button {
+    min-height: 3rem;
+    min-width: 6rem;
+    font-size: 1.2rem;
+  }
+  
+  .tv-card {
+    padding: 3rem;
+    margin: 2rem;
+  }
+}
+
+/* iOS Safe Area Support */
+.safe-area {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Enhanced Touch Feedback */
+.touch-manipulation {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.active-scale {
+  transition: transform 0.1s ease-in-out;
+}
+
+.active-scale:active {
+  transform: scale(0.95);
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+  .high-contrast {
+    border: 2px solid currentColor;
+  }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  .respect-motion {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
 @layer base {
   body {
     font-family: system-ui, -apple-system, sans-serif;
@@ -23,5 +88,21 @@
   
   .input-field {
     @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200;
+  }
+  
+  .btn-primary {
+    @apply bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200 shadow-md touch-manipulation active-scale;
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200 shadow-md touch-manipulation active-scale;
+  }
+  
+  .tv-button {
+    @apply min-h-[3rem] min-w-[6rem] text-xl font-bold touch-manipulation active-scale;
+  }
+  
+  .tv-card {
+    @apply p-8 m-4 rounded-2xl shadow-2xl;
   }
 }

@@ -65,9 +65,9 @@ const AdminLogin: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center px-2 sm:px-4 lg:px-8 py-4">
-      <div className="w-full max-w-md mx-auto">
-        <div className="card bg-white shadow-2xl rounded-lg p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center px-2 sm:px-4 lg:px-8 py-4 safe-area">
+      <div className="w-full max-w-md mx-auto tv-card">
+        <div className="card bg-white shadow-2xl rounded-lg p-4 sm:p-6 lg:p-8 high-contrast respect-motion">
           <div className="text-center mb-6 sm:mb-8">
             <div className="mx-auto w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mb-3 sm:mb-4">
               <ShieldCheckIcon className="w-8 h-8 sm:w-12 sm:h-12 text-white" />
@@ -95,8 +95,11 @@ const AdminLogin: React.FC = () => {
                   type="text"
                   value={username}
                   onChange={(e) => handleInputChange('username', e.target.value)}
-                  className="input-field pl-9 sm:pl-10 text-sm sm:text-base"
+                  className="input-field pl-9 sm:pl-10 text-sm sm:text-base touch-manipulation"
                   placeholder="Enter your username"
+                  aria-label="Username"
+                  autoCapitalize="off"
+                  autoComplete="username"
                   required
                 />
               </div>
@@ -115,8 +118,10 @@ const AdminLogin: React.FC = () => {
                   type="password"
                   value={password}
                   onChange={(e) => handleInputChange('password', e.target.value)}
-                  className="input-field pl-9 sm:pl-10 text-sm sm:text-base"
+                  className="input-field pl-9 sm:pl-10 text-sm sm:text-base touch-manipulation"
                   placeholder="Enter your password"
+                  aria-label="Password"
+                  autoComplete="current-password"
                   required
                 />
               </div>
@@ -131,7 +136,8 @@ const AdminLogin: React.FC = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed py-3 sm:py-4 text-sm sm:text-base"
+              className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed py-3 sm:py-4 text-sm sm:text-base tv-button"
+              aria-label="Sign in to admin dashboard"
             >
               {isLoading ? (
                 <span className="flex items-center justify-center">

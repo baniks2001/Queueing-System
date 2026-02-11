@@ -74,8 +74,10 @@ const ToastComponent: React.FC<ToastComponentProps> = ({ toast, onClose }) => {
         w-full max-w-sm ${getBackgroundColor()} border rounded-lg shadow-lg pointer-events-auto
         transform transition-all duration-300 ease-in-out
         animate-in slide-in-from-right-full
-        break-words
+        break-words touch-manipulation high-contrast respect-motion
       `}
+      role="alert"
+      aria-live="polite"
     >
       <div className="p-4">
         <div className="flex items-start">
@@ -94,8 +96,9 @@ const ToastComponent: React.FC<ToastComponentProps> = ({ toast, onClose }) => {
           </div>
           <div className="ml-4 flex-shrink-0 flex">
             <button
-              className={`inline-flex ${getTitleColor()} hover:opacity-75 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 rounded-md`}
+              className={`inline-flex ${getTitleColor()} hover:opacity-75 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 rounded-md touch-manipulation active-scale`}
               onClick={() => onClose(toast.id)}
+              aria-label="Dismiss notification"
             >
               <span className="sr-only">Close</span>
               <XMarkIcon className="w-5 h-5" />
