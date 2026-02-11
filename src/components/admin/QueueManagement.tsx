@@ -160,87 +160,162 @@ const QueueManagement: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h3 className="text-2xl font-bold text-gray-800">Person Type Management</h3>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-3 sm:space-y-0">
+        <div>
+          <h3 className="text-xl sm:text-2xl font-bold text-gray-800">Person Type Management</h3>
+          <p className="text-gray-600 mt-1 text-sm sm:text-base">Create and manage person types with High and Low priority levels and color coding</p>
+        </div>
         <button
           onClick={openModal}
-          className="btn-primary flex items-center"
+          className="flex items-center justify-center px-3 py-2 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium touch-manipulation active-scale"
         >
-          <PlusIcon className="w-5 h-5 mr-2" />
-          Add Person Type
+          <PlusIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+          <span className="hidden xs:inline">Add Person Type</span>
+          <span className="xs:hidden">Add</span>
         </button>
       </div>
 
-      <div className="card overflow-x-auto">
+      <div className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
         {isLoading ? (
-          <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="text-gray-500 mt-2">Loading person types...</p>
+          <div className="text-center py-8 sm:py-12">
+            <div className="inline-block animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-blue-600"></div>
+            <p className="text-gray-500 mt-2 text-sm sm:text-base">Loading person types...</p>
           </div>
         ) : (
-          <table className="min-w-full">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Name</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Description</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Priority</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Color</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
+          <>
+            {/* Mobile: Card Layout */}
+            <div className="sm:hidden px-4 py-4 space-y-4">
               {personTypes.map((type) => (
-                <tr key={type._id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="py-3 px-4 font-medium">{type.name}</td>
-                  <td className="py-3 px-4 text-sm text-gray-600">{type.description}</td>
-                  <td className="py-3 px-4">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      type.priority === 'High' 
-                        ? 'bg-red-100 text-red-800' 
-                        : 'bg-blue-100 text-blue-800'
-                    }`}>
-                      {type.priority}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4">
-                    <div className="flex items-center">
-                      <div 
-                        className="w-6 h-6 rounded-full border-2 border-gray-300 mr-2"
-                        style={{ backgroundColor: type.color }}
-                      />
-                      <span className="text-sm text-gray-600">{type.color}</span>
+                <div key={type._id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="space-y-3">
+                    {/* Type Info */}
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="text-sm font-medium text-gray-900 mb-1">{type.name}</div>
+                        <div className="text-xs text-gray-600 mb-2">{type.description}</div>
+                        <div className="flex flex-wrap gap-1 mb-2">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            type.priority === 'High' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {type.priority}
+                          </span>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            type.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          }`}>
+                            {type.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                        </div>
+                        <div className="flex items-center">
+                          <div 
+                            className="w-4 h-4 rounded-full border border-gray-300 mr-2"
+                            style={{ backgroundColor: type.color }}
+                          />
+                          <span className="text-xs text-gray-600">{type.color}</span>
+                        </div>
+                      </div>
                     </div>
-                  </td>
-                  <td className="py-3 px-4">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      type.isActive 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {type.isActive ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4">
-                    <div className="flex space-x-2">
+                    
+                    {/* Action Buttons */}
+                    <div className="flex gap-2 pt-2 border-t border-gray-200">
                       <button
                         onClick={() => handleEdit(type)}
-                        className="text-blue-600 hover:text-blue-800"
+                        className="flex-1 flex items-center justify-center px-2 py-2 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-lg transition-all duration-200 text-xs font-medium touch-manipulation"
+                        title="Edit Person Type"
                       >
-                        <PencilIcon className="w-5 h-5" />
+                        <PencilIcon className="w-3 h-3 mr-1" />
+                        Edit
                       </button>
                       <button
                         onClick={() => handleDelete(type._id)}
-                        className="text-red-600 hover:text-red-800"
+                        className="flex-1 flex items-center justify-center px-2 py-2 text-red-600 hover:text-red-900 hover:bg-red-50 rounded-lg transition-all duration-200 text-xs font-medium touch-manipulation"
+                        title="Delete Person Type"
                       >
-                        <TrashIcon className="w-5 h-5" />
+                        <TrashIcon className="w-3 h-3 mr-1" />
+                        Delete
                       </button>
                     </div>
-                  </td>
-                </tr>
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
+              {personTypes.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  <p className="text-sm font-medium">No person types found</p>
+                </div>
+              )}
+            </div>
+            
+            {/* Desktop/Tablet: Table Layout */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="min-w-full">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Name</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Description</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Priority</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Color</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
+                    <th className="text-left py-3 px-4 font-semibold text-gray-700">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {personTypes.map((type) => (
+                    <tr key={type._id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-3 px-4 font-medium">{type.name}</td>
+                      <td className="py-3 px-4 text-sm text-gray-600">{type.description}</td>
+                      <td className="py-3 px-4">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          type.priority === 'High' 
+                            ? 'bg-red-100 text-red-800' 
+                            : 'bg-blue-100 text-blue-800'
+                        }`}>
+                          {type.priority}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center">
+                          <div 
+                            className="w-6 h-6 rounded-full border-2 border-gray-300 mr-2"
+                            style={{ backgroundColor: type.color }}
+                          />
+                          <span className="text-sm text-gray-600">{type.color}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          type.isActive 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {type.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleEdit(type)}
+                            className="text-blue-600 hover:text-blue-800 p-1 hover:bg-blue-50 rounded transition-colors"
+                          >
+                            <PencilIcon className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(type._id)}
+                            className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded transition-colors"
+                          >
+                            <TrashIcon className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {personTypes.length === 0 && (
+                <div className="text-center py-12 text-gray-500">
+                  <p className="text-sm font-medium">No person types found</p>
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
 
@@ -299,17 +374,17 @@ const QueueManagement: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex justify-end space-x-3 pt-4">
+              <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-3 pt-4">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="btn-secondary"
+                  className="w-full sm:w-auto px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors font-medium touch-manipulation"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="btn-primary"
+                  className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium touch-manipulation"
                 >
                   {editingType ? 'Update' : 'Create'}
                 </button>

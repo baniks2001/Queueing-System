@@ -18,6 +18,8 @@ import {
   DocumentArrowDownIcon,
   TrashIcon,
   MagnifyingGlassIcon,
+  CalendarIcon,
+  ChartBarIcon,
   ArrowRightOnRectangleIcon
 } from '@heroicons/react/24/outline';
 import UserManagement from './UserManagement';
@@ -46,6 +48,7 @@ interface TransactionHistory {
 
 const AdminDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [stats, setStats] = useState<AdminStats>({
     totalUsers: 0,
     activeUsers: 0,
@@ -422,122 +425,170 @@ const AdminDashboard: React.FC = () => {
 
   const renderDashboard = () => (
     <div className="space-y-6">
-      {/* Kiosk Status - Modern Card */}
+      {/* Kiosk Status - Professional Card */}
       {user?.role === 'super_admin' && (
         <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4">
+          {/* Status Header */}
+          <div className="bg-gradient-to-r from-slate-800 to-slate-700 px-6 py-6">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className={`w-4 h-4 rounded-full ${
-                  isKioskOpen ? 'bg-green-400 shadow-lg shadow-green-400/50' : 
-                  kioskStatus === 'standby' ? 'bg-yellow-400 shadow-lg shadow-yellow-400/50' : 'bg-red-400 shadow-lg shadow-red-400/50'
-                } animate-pulse`}></div>
+              <div className="flex items-center space-x-6">
+                {/* Status Indicator */}
+                <div className="relative">
+                  <div className={`w-5 h-5 rounded-full ${
+                    isKioskOpen ? 'bg-emerald-500' : 
+                    kioskStatus === 'standby' ? 'bg-amber-500' : 'bg-red-500'
+                  }`}></div>
+                  <div className={`absolute inset-0 w-5 h-5 rounded-full ${
+                    isKioskOpen ? 'bg-emerald-500' : 
+                    kioskStatus === 'standby' ? 'bg-amber-500' : 'bg-red-500'
+                  } animate-ping opacity-75`}></div>
+                </div>
+                
+                {/* Status Text */}
                 <div>
-                  <h3 className="text-xl font-bold text-white">
-                    Kiosk Status: <span className="font-light">
-                      {isKioskOpen ? 'OPEN' : kioskStatus === 'standby' ? 'STANDBY' : 'CLOSED'}
+                  <div className="flex items-center space-x-3">
+                    <h3 className="text-2xl font-bold text-white">Kiosk Status</h3>
+                    <span className={`px-4 py-1.5 rounded-full text-sm font-semibold ${
+                      isKioskOpen ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 
+                      kioskStatus === 'standby' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 
+                      'bg-red-500/20 text-red-300 border border-red-500/30'
+                    }`}>
+                      {isKioskOpen ? 'OPERATIONAL' : kioskStatus === 'standby' ? 'STANDBY' : 'OFFLINE'}
                     </span>
-                  </h3>
-                  <p className="text-blue-100 text-sm mt-1">
-                    {isKioskOpen ? 'Public kiosk is currently accepting queue numbers' : 'Public kiosk is closed'}
+                  </div>
+                  <p className="text-slate-300 text-sm mt-1 font-medium">
+                    {isKioskOpen ? 'System is active and serving clients' : 
+                     kioskStatus === 'standby' ? 'System is temporarily paused' : 
+                     'System is currently offline'}
                   </p>
+                </div>
+              </div>
+              
+              {/* Status Metrics */}
+              <div className="hidden lg:flex items-center space-x-8">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-white">{stats.waitingQueues}</div>
+                  <div className="text-xs text-slate-400 uppercase tracking-wide">Waiting</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-white">{stats.servingQueues}</div>
+                  <div className="text-xs text-slate-400 uppercase tracking-wide">Serving</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-white">{stats.totalQueues}</div>
+                  <div className="text-xs text-slate-400 uppercase tracking-wide">Total</div>
                 </div>
               </div>
             </div>
           </div>
           
-          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
-            <div className="flex flex-col lg:flex-row gap-4">
-              <div className="flex-1">
-                <h4 className="text-sm font-semibold text-gray-700 mb-2">Government Office/Company Name:</h4>
-                <input
-                  type="text"
-                  value={governmentOfficeName}
-                  onChange={(e) => setGovernmentOfficeName(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all duration-200"
-                  placeholder="Enter government office or company name"
-                />
-              </div>
-              <div className="flex-1">
-                <h4 className="text-sm font-semibold text-gray-700 mb-2">
-                  {isKioskOpen ? 'Current Title:' : 'Set Kiosk Title:'}
-                </h4>
-                <div className="flex gap-2">
+          {/* Configuration Section */}
+          <div className="px-6 py-6 bg-gray-50 border-t border-gray-200">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Organization Settings */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Organization Name</label>
                   <input
                     type="text"
-                    value={kioskTitle}
-                    onChange={(e) => setKioskTitle(e.target.value)}
-                    className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all duration-200"
-                    placeholder="Enter kiosk title"
+                    value={governmentOfficeName}
+                    onChange={(e) => setGovernmentOfficeName(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all duration-200 bg-white shadow-sm"
+                    placeholder="Enter organization name"
                   />
-                  <button
-                    onClick={updateKioskTitle}
-                    className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-sm transition-all duration-200 shadow-md hover:shadow-lg"
-                  >
-                    Update Settings
-                  </button>
                 </div>
-                {!isKioskOpen && (!kioskTitle || kioskTitle.trim() === '') && (
-                  <p className="text-xs text-red-600 mt-1">Title is required before opening kiosk</p>
-                )}
-              </div>
-            </div>
-
-            {/* Logo Upload */}
-            <div className="mt-4 pt-4 border-t border-gray-300">
-              <h4 className="text-sm font-semibold text-gray-700 mb-3">Logo Upload:</h4>
-              <div className="flex items-center space-x-4">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={uploadLogo}
-                  className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition-all duration-200"
-                />
-                {logo && (
-                  <div className="flex items-center space-x-3">
-                    <img 
-                      src={getUploadUrl(logo)} 
-                      alt="Logo" 
-                      className="h-12 w-12 object-contain border border-gray-300 rounded-lg shadow-sm"
-                      onError={(e) => {
-                        console.error('Logo failed to load:', getUploadUrl(logo));
-                        e.currentTarget.style.display = 'none';
-                      }}
+                
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    {isKioskOpen ? 'Display Title' : 'Kiosk Title'}
+                  </label>
+                  <div className="flex gap-3">
+                    <input
+                      type="text"
+                      value={kioskTitle}
+                      onChange={(e) => setKioskTitle(e.target.value)}
+                      className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all duration-200 bg-white shadow-sm"
+                      placeholder="Enter kiosk display title"
                     />
-                    <span className="text-sm text-green-600 font-medium">Logo uploaded successfully</span>
+                    <button
+                      onClick={updateKioskTitle}
+                      className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-sm transition-all duration-200 shadow-md hover:shadow-lg"
+                    >
+                      Update
+                    </button>
                   </div>
-                )}
+                  {!isKioskOpen && (!kioskTitle || kioskTitle.trim() === '') && (
+                    <p className="text-xs text-red-600 mt-2 font-medium">⚠️ Title is required before activating kiosk</p>
+                  )}
+                </div>
               </div>
-              <p className="text-xs text-gray-500 mt-2">Upload a logo (max 5MB, image files only)</p>
+              
+              {/* Branding Section */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Organization Logo</label>
+                  <div className="flex items-start space-x-4">
+                    <div className="flex-1">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={uploadLogo}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition-all duration-200 bg-white shadow-sm"
+                      />
+                      <p className="text-xs text-gray-500 mt-2">Supported formats: JPG, PNG, GIF (Max 5MB)</p>
+                    </div>
+                    {logo && (
+                      <div className="flex flex-col items-center space-y-2">
+                        <div className="relative">
+                          <img 
+                            src={getUploadUrl(logo)} 
+                            alt="Organization Logo" 
+                            className="h-16 w-16 object-contain border-2 border-gray-200 rounded-lg shadow-sm bg-white p-2"
+                            onError={(e) => {
+                              console.error('Logo failed to load:', getUploadUrl(logo));
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                          <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white"></div>
+                        </div>
+                        <span className="text-xs text-emerald-600 font-medium">Active</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           
           {/* Kiosk Control Buttons */}
-          <div className="px-6 pb-4">
-            <div className="flex flex-col sm:flex-row gap-3">
+          <div className="px-4 sm:px-6 pb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {!isKioskOpen ? (
                 <button
                   onClick={openKiosk}
-                  className="flex items-center justify-center px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-200 text-sm font-semibold shadow-lg hover:shadow-xl transform hover:scale-105"
+                  className="flex items-center justify-center px-4 py-3 sm:px-6 sm:py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-200 text-sm font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 touch-manipulation"
                 >
-                  <PlayIcon className="w-5 h-5 mr-2" />
-                  Open Kiosk
+                  <PlayIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                  <span className="hidden xs:inline">Open Kiosk</span>
+                  <span className="xs:hidden">Open</span>
                 </button>
               ) : (
                 <>
                   <button
                     onClick={closeKiosk}
-                    className="flex items-center justify-center px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl hover:from-red-700 hover:to-red-800 transition-all duration-200 text-sm font-semibold shadow-lg hover:shadow-xl transform hover:scale-105"
+                    className="flex items-center justify-center px-4 py-3 sm:px-6 sm:py-3 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl hover:from-red-700 hover:to-red-800 transition-all duration-200 text-sm font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 touch-manipulation"
                   >
-                    <StopIcon className="w-5 h-5 mr-2" />
-                    Close Kiosk
+                    <StopIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                    <span className="hidden xs:inline">Close Kiosk</span>
+                    <span className="xs:hidden">Close</span>
                   </button>
                   <button
                     onClick={standbyKiosk}
-                    className="flex items-center justify-center px-6 py-3 bg-gradient-to-r from-yellow-600 to-yellow-700 text-white rounded-xl hover:from-yellow-700 hover:to-yellow-800 transition-all duration-200 text-sm font-semibold shadow-lg hover:shadow-xl transform hover:scale-105"
+                    className="flex items-center justify-center px-4 py-3 sm:px-6 sm:py-3 bg-gradient-to-r from-yellow-600 to-yellow-700 text-white rounded-xl hover:from-yellow-700 hover:to-yellow-800 transition-all duration-200 text-sm font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 touch-manipulation"
                   >
-                    <ClockIcon className="w-5 h-5 mr-2" />
-                    Standby
+                    <ClockIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                    <span className="hidden xs:inline">Standby</span>
+                    <span className="xs:hidden">Wait</span>
                   </button>
                 </>
               )}
@@ -546,37 +597,37 @@ const AdminDashboard: React.FC = () => {
         </div>
       )}
       {/* Modern Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 border border-blue-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-blue-100 text-sm font-medium uppercase tracking-wide">Total Queues Today</p>
-              <p className="text-3xl font-bold mt-1">{stats.totalQueues}</p>
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white p-3 sm:p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 border border-blue-500">
+          <div className="flex flex-col sm:flex-row items-center justify-between">
+            <div className="text-center sm:text-left">
+              <p className="text-blue-100 text-xs sm:text-sm font-medium uppercase tracking-wide mb-1 sm:mb-1">Total Queues</p>
+              <p className="text-xl sm:text-3xl font-bold">{stats.totalQueues}</p>
             </div>
-            <div className="bg-blue-500/20 p-3 rounded-xl">
-              <QueueListIcon className="w-8 h-8 text-blue-100" />
-            </div>
-          </div>
-        </div>
-        <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 text-white p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 border border-emerald-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-emerald-100 text-sm font-medium uppercase tracking-wide">Currently Waiting</p>
-              <p className="text-3xl font-bold mt-1">{stats.waitingQueues}</p>
-            </div>
-            <div className="bg-emerald-500/20 p-3 rounded-xl">
-              <UserGroupIcon className="w-8 h-8 text-emerald-100" />
+            <div className="bg-blue-500/20 p-2 sm:p-3 rounded-xl mt-2 sm:mt-0">
+              <QueueListIcon className="w-4 h-4 sm:w-8 sm:h-8 text-blue-100" />
             </div>
           </div>
         </div>
-        <div className="bg-gradient-to-br from-purple-600 to-purple-700 text-white p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 border border-purple-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-purple-100 text-sm font-medium uppercase tracking-wide">Currently Serving</p>
-              <p className="text-3xl font-bold mt-1">{stats.servingQueues}</p>
+        <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 text-white p-3 sm:p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 border border-emerald-500">
+          <div className="flex flex-col sm:flex-row items-center justify-between">
+            <div className="text-center sm:text-left">
+              <p className="text-emerald-100 text-xs sm:text-sm font-medium uppercase tracking-wide mb-1 sm:mb-1">Waiting</p>
+              <p className="text-xl sm:text-3xl font-bold">{stats.waitingQueues}</p>
             </div>
-            <div className="bg-purple-500/20 p-3 rounded-xl">
-              <TicketIcon className="w-8 h-8 text-purple-100" />
+            <div className="bg-emerald-500/20 p-2 sm:p-3 rounded-xl mt-2 sm:mt-0">
+              <UserGroupIcon className="w-4 h-4 sm:w-8 sm:h-8 text-emerald-100" />
+            </div>
+          </div>
+        </div>
+        <div className="bg-gradient-to-br from-purple-600 to-purple-700 text-white p-3 sm:p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 border border-purple-500">
+          <div className="flex flex-col sm:flex-row items-center justify-between">
+            <div className="text-center sm:text-left">
+              <p className="text-purple-100 text-xs sm:text-sm font-medium uppercase tracking-wide mb-1 sm:mb-1">Serving</p>
+              <p className="text-xl sm:text-3xl font-bold">{stats.servingQueues}</p>
+            </div>
+            <div className="bg-purple-500/20 p-2 sm:p-3 rounded-xl mt-2 sm:mt-0">
+              <TicketIcon className="w-4 h-4 sm:w-8 sm:h-8 text-purple-100" />
             </div>
           </div>
         </div>
@@ -585,72 +636,138 @@ const AdminDashboard: React.FC = () => {
       {/* Modern Transaction History */}
       {user?.role === 'super_admin' && (
         <div className="mt-8 bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
-          <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
-            <div className="flex justify-between items-center">
-              <h3 className="text-xl font-bold text-gray-900">Recent Transaction History</h3>
+          <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-4 sm:px-6 py-4 border-b border-gray-200">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-3 sm:space-y-0">
+              <h3 className="text-lg sm:text-xl font-bold text-gray-900">Recent Transaction History</h3>
               <button
                 onClick={() => setShowHistoryModal(true)}
-                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 text-sm font-medium shadow-md hover:shadow-lg"
+                className="flex items-center justify-center px-3 py-2 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 text-sm font-medium shadow-md hover:shadow-lg touch-manipulation"
               >
                 <MagnifyingGlassIcon className="w-4 h-4 mr-2" />
-                View All
+                <span className="hidden xs:inline">View All</span>
+                <span className="xs:hidden">All</span>
               </button>
             </div>
           </div>
           
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Title</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Total</th>
-                  <th className="hidden sm:table-cell px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-100">
-                {transactionHistory.slice(0, 5).map((transaction) => (
-                  <tr key={transaction._id} className="hover:bg-gray-50 transition-colors duration-150">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
-                      {new Date(transaction.date).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {transaction.title}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+          {/* Mobile: Card Layout */}
+          <div className="sm:hidden px-4 py-4 space-y-4">
+            {transactionHistory.slice(0, 5).map((transaction) => (
+              <div key={transaction._id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <div className="space-y-3">
+                  {/* Date and Title */}
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="text-xs font-medium text-gray-500 mb-1">
+                        {new Date(transaction.date).toLocaleDateString()}
+                      </div>
+                      <div className="text-sm font-medium text-gray-900 truncate">
+                        {transaction.title}
+                      </div>
+                    </div>
+                    <div className="ml-3">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
                         {transaction.totalTransactions}
                       </span>
-                    </td>
-                    <td className="hidden sm:table-cell px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => viewTransaction(transaction)}
-                          className="text-blue-600 hover:text-blue-900 p-2 hover:bg-blue-50 rounded-lg transition-all duration-200"
-                          title="View Transaction"
-                        >
-                          <MagnifyingGlassIcon className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => exportTransaction(transaction)}
-                          className="text-green-600 hover:text-green-900 p-2 hover:bg-green-50 rounded-lg transition-all duration-200"
-                          title="Export Transaction"
-                        >
-                          <DocumentArrowDownIcon className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => deleteTransaction(transaction._id)}
-                          className="text-red-600 hover:text-red-900 p-2 hover:bg-red-50 rounded-lg transition-all duration-200"
-                          title="Delete Transaction"
-                        >
-                          <TrashIcon className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+                    </div>
+                  </div>
+                  
+                  {/* Action Buttons */}
+                  <div className="flex gap-2 pt-2 border-t border-gray-200">
+                    <button
+                      onClick={() => viewTransaction(transaction)}
+                      className="flex-1 flex items-center justify-center px-3 py-2 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-lg transition-all duration-200 text-xs font-medium touch-manipulation"
+                      title="View Transaction"
+                    >
+                      <MagnifyingGlassIcon className="w-3 h-3 mr-1" />
+                      View
+                    </button>
+                    <button
+                      onClick={() => exportTransaction(transaction)}
+                      className="flex-1 flex items-center justify-center px-3 py-2 text-green-600 hover:text-green-900 hover:bg-green-50 rounded-lg transition-all duration-200 text-xs font-medium touch-manipulation"
+                      title="Export Transaction"
+                    >
+                      <DocumentArrowDownIcon className="w-3 h-3 mr-1" />
+                      Export
+                    </button>
+                    <button
+                      onClick={() => deleteTransaction(transaction._id)}
+                      className="flex-1 flex items-center justify-center px-3 py-2 text-red-600 hover:text-red-900 hover:bg-red-50 rounded-lg transition-all duration-200 text-xs font-medium touch-manipulation"
+                      title="Delete Transaction"
+                    >
+                      <TrashIcon className="w-3 h-3 mr-1" />
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {transactionHistory.length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                <div className="flex flex-col items-center">
+                  <DocumentArrowDownIcon className="w-8 h-8 text-gray-300 mb-3" />
+                  <p className="text-sm font-medium">No transaction history available</p>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* Desktop/Tablet: Table Layout */}
+          <div className="hidden sm:block overflow-x-auto">
+            <div className="min-w-full">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Title</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Total</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-100">
+                  {transactionHistory.slice(0, 5).map((transaction) => (
+                    <tr key={transaction._id} className="hover:bg-gray-50 transition-colors duration-150">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                        {new Date(transaction.date).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {transaction.title}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                          {transaction.totalTransactions}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => viewTransaction(transaction)}
+                            className="text-blue-600 hover:text-blue-900 p-2 hover:bg-blue-50 rounded-lg transition-all duration-200"
+                            title="View Transaction"
+                          >
+                            <MagnifyingGlassIcon className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => exportTransaction(transaction)}
+                            className="text-green-600 hover:text-green-900 p-2 hover:bg-green-50 rounded-lg transition-all duration-200"
+                            title="Export Transaction"
+                          >
+                            <DocumentArrowDownIcon className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => deleteTransaction(transaction._id)}
+                            className="text-red-600 hover:text-red-900 p-2 hover:bg-red-50 rounded-lg transition-all duration-200"
+                            title="Delete Transaction"
+                          >
+                            <TrashIcon className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             {transactionHistory.length === 0 && (
               <div className="text-center py-12 text-gray-500">
                 <div className="flex flex-col items-center">
@@ -720,17 +837,17 @@ const AdminDashboard: React.FC = () => {
             </div>
           </div>
           
-          <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3">
+          <div className="mt-4 sm:mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <button
               onClick={() => exportTransaction(selectedTransaction)}
-              className="flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
+              className="flex items-center justify-center px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium touch-manipulation active-scale"
             >
               <DocumentArrowDownIcon className="w-4 h-4 mr-2" />
               Export
             </button>
             <button
               onClick={() => setSelectedTransaction(null)}
-              className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 text-sm"
+              className="flex items-center justify-center px-4 py-3 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 text-sm font-medium touch-manipulation active-scale"
             >
               Close
             </button>
@@ -744,66 +861,173 @@ const AdminDashboard: React.FC = () => {
     if (!showHistoryModal) return null;
 
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[80vh] overflow-hidden">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">All Transaction History</h3>
-            <button
-              onClick={() => setShowHistoryModal(false)}
-              className="text-gray-400 hover:text-gray-600"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+      <div className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full mx-4 max-h-[85vh] overflow-hidden border border-gray-200">
+          {/* Modal Header */}
+          <div className="bg-gradient-to-r from-slate-800 to-slate-700 px-6 py-5 border-b border-slate-600">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-slate-600 rounded-lg">
+                  <DocumentArrowDownIcon className="w-5 h-5 text-slate-200" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">Transaction History</h3>
+                  <p className="text-slate-300 text-sm mt-0.5">
+                    Complete record of all transaction sessions
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowHistoryModal(false)}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-600 rounded-lg transition-colors duration-200"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
           
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Transactions</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {transactionHistory.map((transaction) => (
-                  <tr key={transaction._id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {new Date(transaction.date).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {transaction.title}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {transaction.totalTransactions}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button
-                        onClick={() => {
-                          setSelectedTransaction(transaction);
-                          setShowHistoryModal(false);
-                        }}
-                        className="text-indigo-600 hover:text-indigo-900 mr-3"
-                      >
-                        View
-                      </button>
-                      <button
-                        onClick={() => exportTransaction(transaction)}
-                        className="text-green-600 hover:text-green-900"
-                      >
-                        Export
-                      </button>
-                    </td>
+          {/* Modal Body */}
+          <div className="flex-1 overflow-hidden">
+            {/* Summary Stats */}
+            <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-white rounded-lg p-4 border border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Sessions</p>
+                      <p className="text-2xl font-bold text-gray-900 mt-1">{transactionHistory.length}</p>
+                    </div>
+                    <div className="p-3 bg-blue-100 rounded-lg">
+                      <CalendarIcon className="w-5 h-5 text-blue-600" />
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg p-4 border border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Transactions</p>
+                      <p className="text-2xl font-bold text-gray-900 mt-1">
+                        {transactionHistory.reduce((sum, t) => sum + t.totalTransactions, 0)}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-emerald-100 rounded-lg">
+                      <QueueListIcon className="w-5 h-5 text-emerald-600" />
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg p-4 border border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Avg per Session</p>
+                      <p className="text-2xl font-bold text-gray-900 mt-1">
+                        {transactionHistory.length > 0 
+                          ? Math.round(transactionHistory.reduce((sum, t) => sum + t.totalTransactions, 0) / transactionHistory.length)
+                          : 0}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-purple-100 rounded-lg">
+                      <ChartBarIcon className="w-5 h-5 text-purple-600" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Date</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Transaction Type</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Total Served</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Duration</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {transactionHistory.map((transaction, index) => (
+                    <tr key={transaction._id} className="hover:bg-gray-50 transition-colors duration-150">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm">
+                          <div className="font-medium text-gray-900">
+                            {new Date(transaction.date).toLocaleDateString('en-US', { 
+                              weekday: 'short',
+                              year: 'numeric', 
+                              month: 'short', 
+                              day: 'numeric' 
+                            })}
+                          </div>
+                          <div className="text-gray-500 text-xs">
+                            {new Date(transaction.date).toLocaleTimeString('en-US', { 
+                              hour: '2-digit', 
+                              minute: '2-digit' 
+                            })}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-8 w-8 flex items-center justify-center bg-blue-100 rounded-full">
+                            <DocumentArrowDownIcon className="w-4 h-4 text-blue-600" />
+                          </div>
+                          <div className="ml-3">
+                            <div className="text-sm font-medium text-gray-900">{transaction.title}</div>
+                            <div className="text-xs text-gray-500">Session #{index + 1}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          {transaction.totalTransactions}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {transaction.transactionTypes && Object.keys(transaction.transactionTypes).length > 0 ? (
+                          <div className="flex items-center space-x-1">
+                            <ClockIcon className="w-4 h-4 text-gray-400" />
+                            <span>{Object.keys(transaction.transactionTypes).length} types</span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => {
+                              setSelectedTransaction(transaction);
+                              setShowHistoryModal(false);
+                            }}
+                            className="inline-flex items-center px-3 py-2 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors duration-200 shadow-sm hover:shadow-md"
+                          >
+                            <EyeIcon className="w-3 h-3 mr-1.5" />
+                            View Details
+                          </button>
+                          <button
+                            onClick={() => exportTransaction(transaction)}
+                            className="inline-flex items-center px-3 py-2 bg-emerald-600 text-white text-xs font-medium rounded-lg hover:bg-emerald-700 transition-colors duration-200 shadow-sm hover:shadow-md"
+                          >
+                            <DocumentArrowDownIcon className="w-3 h-3 mr-1.5" />
+                            Export
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
             {transactionHistory.length === 0 && (
-              <div className="text-center py-8 text-gray-500">
-                No transaction history available
+              <div className="text-center py-12">
+                <div className="flex flex-col items-center">
+                  <DocumentArrowDownIcon className="w-12 h-12 text-gray-300 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Transaction History</h3>
+                  <p className="text-gray-500">No transaction sessions have been recorded yet.</p>
+                </div>
               </div>
             )}
           </div>
@@ -924,33 +1148,49 @@ const AdminDashboard: React.FC = () => {
         type="danger"
       />
       
-      {/* Dark Blue Header */}
+      {/* Compact Header */}
       <header className="bg-gradient-to-r from-blue-900 to-blue-800 shadow-lg border-b border-blue-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center py-4 sm:py-6 space-y-4 sm:space-y-0">
-            <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-6">
-              <div className="text-center sm:text-left">
-                <h1 className="text-2xl sm:text-3xl font-bold text-white">Admin Dashboard</h1>
-                <span className="text-blue-200 text-sm sm:text-base block mt-1">
-                  Welcome back, <span className="font-semibold text-white">{user?.username}</span>
-                </span>
-              </div>
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6">
+          <div className="flex justify-between items-center py-2 sm:py-3">
+            {/* Left side - Title */}
+            <div className="flex items-center">
+              <h1 className="text-lg sm:text-2xl font-bold text-white">Admin Dashboard</h1>
+              <span className="text-blue-200 text-xs sm:text-sm ml-2 sm:ml-3 block">
+                {user?.username}
+              </span>
             </div>
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+            
+            {/* Right side - Dropdown Menu */}
+            <div className="relative">
               <button
-                onClick={() => navigate('/display')}
-                className="flex items-center justify-center px-4 py-2.5 bg-blue-700 text-white rounded-lg hover:bg-blue-600 transition-all duration-200 text-sm font-medium shadow-md hover:shadow-lg transform hover:scale-105"
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="flex items-center justify-center p-2 rounded-lg hover:bg-blue-700 transition-colors touch-manipulation active-scale"
+                aria-label="Menu"
+                aria-expanded={isDropdownOpen}
               >
-                <EyeIcon className="w-4 h-4 mr-2" />
-                View Display
+                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
               </button>
-              <button
-                onClick={handleLogout}
-                className="flex items-center justify-center px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all duration-200 text-sm font-medium shadow-md hover:shadow-lg transform hover:scale-105"
-              >
-                <ArrowRightOnRectangleIcon className="w-4 h-4 mr-2" />
-                Logout
-              </button>
+              
+              {isDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden z-50">
+                  <button
+                    onClick={() => { setIsDropdownOpen(false); navigate('/display'); }}
+                    className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 flex items-center transition-colors"
+                  >
+                    <EyeIcon className="w-4 h-4 mr-3 text-gray-500" />
+                    View Display
+                  </button>
+                  <button
+                    onClick={() => { setIsDropdownOpen(false); handleLogout(); }}
+                    className="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 flex items-center transition-colors border-t border-gray-200"
+                  >
+                    <ArrowRightOnRectangleIcon className="w-4 h-4 mr-3 text-red-500" />
+                    Logout
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -958,22 +1198,30 @@ const AdminDashboard: React.FC = () => {
 
       {/* Modern Navigation Tabs */}
       <div className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex space-x-1 py-1 overflow-x-auto">
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8">
+          {/* One line layout for all screen sizes */}
+          <nav className="flex justify-between py-2 gap-1">
             {filteredTabs.map((tab) => {
               const IconComponent = tab.icon;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center justify-center px-4 py-3 rounded-xl font-medium transition-all duration-200 text-sm whitespace-nowrap ${
+                  className={`flex flex-col sm:flex-row items-center justify-center px-1 sm:px-2 py-2 rounded-lg font-medium transition-all duration-200 text-xs touch-manipulation flex-1 ${
                     activeTab === tab.id
                       ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md transform scale-105'
                       : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50 hover:shadow-sm'
                   }`}
                 >
-                  <IconComponent className={`w-5 h-5 mr-2 ${activeTab === tab.id ? 'text-white' : 'text-gray-400'}`} />
-                  <span className="font-medium">{tab.name}</span>
+                  <IconComponent className={`w-4 h-4 ${activeTab === tab.id ? 'text-white' : 'text-gray-400'} ${tab.name.length > 10 ? 'sm:mr-1' : 'sm:mr-2'}`} />
+                  <span className={`font-medium ${tab.name.length > 10 ? 'hidden sm:block' : 'block'} text-center leading-tight`}>
+                    {tab.name.length > 10 ? 
+                      (tab.name.includes('Management') ? tab.name.replace(' Management', '') : 
+                       tab.name.includes('Transaction') ? 'Trans. Flow' : 
+                       tab.name.substring(0, 8) + '...') : 
+                      tab.name
+                    }
+                  </span>
                 </button>
               );
             })}

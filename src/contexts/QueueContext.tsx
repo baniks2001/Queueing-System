@@ -51,15 +51,16 @@ export const QueueProvider: React.FC<QueueProviderProps> = ({ children }) => {
   const [waitingQueues, setWaitingQueues] = useState<Queue[]>([]);
   const [socket, setSocket] = useState<Socket | null>(null);
 
-  const playSound = (queueNumber: string, windowNumber: number) => {
-    const utterance = new SpeechSynthesisUtterance(
-      `Now serving number ${queueNumber} at window ${windowNumber}`
-    );
-    utterance.rate = 0.9;
-    utterance.pitch = 1;
-    utterance.volume = 1;
-    speechSynthesis.speak(utterance);
-  };
+  // Sound functionality removed - announcements should only play in PublicDisplay
+  // const playSound = (queueNumber: string, windowNumber: number) => {
+  //   const utterance = new SpeechSynthesisUtterance(
+  //     `Now serving number ${queueNumber} at window ${windowNumber}`
+  //   );
+  //   utterance.rate = 0.9;
+  //   utterance.pitch = 1;
+  //   utterance.volume = 1;
+  //   speechSynthesis.speak(utterance);
+  // };
 
   const refreshQueues = async () => {
     try {
@@ -115,10 +116,11 @@ export const QueueProvider: React.FC<QueueProviderProps> = ({ children }) => {
       refreshQueues();
     });
 
-    newSocket.on('soundNotification', (data) => {
-      console.log('Sound notification:', data);
-      playSound(data.queueNumber, data.windowNumber);
-    });
+    // Sound notification listener removed - announcements should only play in PublicDisplay
+    // newSocket.on('soundNotification', (data) => {
+    //   console.log('Sound notification:', data);
+    //   playSound(data.queueNumber, data.windowNumber);
+    // });
 
     newSocket.on('repeat-announcement', (data) => {
       console.log('Repeat announcement triggered:', data);

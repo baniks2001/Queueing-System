@@ -1018,17 +1018,18 @@ return (
               </div>
               
               {onHoldQueues.length > 0 ? (
-                <div className="mt-4">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="border-b-2 border-gray-200">
-                        <th className="text-left py-2 px-3 text-sm font-semibold text-gray-700">Queue #</th>
-                        <th className="text-left py-2 px-3 text-sm font-semibold text-gray-700">Service</th>
-                        <th className="text-left py-2 px-3 text-sm font-semibold text-gray-700">Type</th>
-                        <th className="text-left py-2 px-3 text-sm font-semibold text-gray-700">Hold Time</th>
-                        <th className="text-left py-2 px-3 text-sm font-semibold text-gray-700">Action</th>
-                      </tr>
-                    </thead>
+                <div className="mt-4 overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+                  <div className="min-w-full sm:min-w-0">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="border-b-2 border-gray-200">
+                          <th className="text-left py-2 px-3 text-xs sm:text-sm font-semibold text-gray-700 min-w-[80px]">Queue #</th>
+                          <th className="text-left py-2 px-3 text-xs sm:text-sm font-semibold text-gray-700 min-w-[100px] hidden sm:table-cell">Service</th>
+                          <th className="text-left py-2 px-3 text-xs sm:text-sm font-semibold text-gray-700 min-w-[80px] hidden md:table-cell">Type</th>
+                          <th className="text-left py-2 px-3 text-xs sm:text-sm font-semibold text-gray-700 min-w-[80px]">Hold Time</th>
+                          <th className="text-left py-2 px-3 text-xs sm:text-sm font-semibold text-gray-700 min-w-[150px]">Action</th>
+                        </tr>
+                      </thead>
                     <tbody>
                       {onHoldQueues.slice(0, 5).map((queue, index) => {
                         // Calculate hold time
@@ -1039,16 +1040,19 @@ return (
                         return (
                           <tr key={queue._id} className="border-b border-gray-200 hover:bg-orange-50">
                             <td className="py-2 px-3">
-                              <div className="font-semibold text-sm sm:text-base text-gray-900">
+                              <div className="font-semibold text-xs sm:text-sm text-gray-900">
                                 {queue.queueNumber}
                               </div>
+                              <div className="text-xs text-gray-600 sm:hidden mt-1">
+                                {queue.service}
+                              </div>
                             </td>
-                            <td className="py-2 px-3">
+                            <td className="py-2 px-3 hidden sm:table-cell">
                               <div className="text-xs sm:text-sm text-gray-600">
                                 {queue.service}
                               </div>
                             </td>
-                            <td className="py-2 px-3">
+                            <td className="py-2 px-3 hidden md:table-cell">
                               <div className="text-xs text-gray-500">
                                 {queue.personType}
                               </div>
@@ -1062,29 +1066,33 @@ return (
                               </div>
                             </td>
                             <td className="py-2 px-3">
-                              <div className="flex space-x-2">
+                              <div className="flex flex-col sm:flex-row gap-1 sm:gap-2">
                                 <button
                                   onClick={() => handleServeOnHold(queue._id)}
                                   disabled={isCalling}
-                                  className="bg-orange-600 text-white py-1 px-3 rounded text-sm font-medium hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center"
+                                  className="w-full sm:w-auto bg-orange-600 text-white py-2 sm:py-1 px-3 rounded text-xs sm:text-sm font-medium hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center touch-manipulation active-scale tv-button"
+                                  aria-label={`Serve queue ${queue.queueNumber}`}
                                 >
                                   {isCalling ? (
                                     <>
-                                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2"></div>
-                                      <span>...</span>
+                                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-1 sm:mr-2"></div>
+                                      <span className="hidden xs:inline">...</span>
+                                      <span className="xs:hidden">Wait</span>
                                     </>
                                   ) : (
                                     <>
-                                      <PlayIcon className="h-3 w-3 mr-1" />
-                                      <span>Serve</span>
+                                      <PlayIcon className="h-3 w-3 sm:h-3 sm:w-3 mr-1" />
+                                      <span className="hidden xs:inline">Serve</span>
+                                      <span className="xs:hidden">▶</span>
                                     </>
                                   )}
                                 </button>
                                 <button
                                   onClick={() => handleDeleteOnHold(queue._id, queue.queueNumber)}
                                   disabled={isCalling}
-                                  className="bg-red-600 text-white py-1 px-2 rounded text-sm font-medium hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center"
-                                  title="Delete this on-hold queue"
+                                  className="w-full sm:w-auto bg-red-600 text-white py-2 sm:py-1 px-3 rounded text-xs sm:text-sm font-medium hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center touch-manipulation active-scale tv-button"
+                                  title={`Delete queue ${queue.queueNumber}`}
+                                  aria-label={`Delete queue ${queue.queueNumber}`}
                                 >
                                   {isCalling ? (
                                     <>
@@ -1092,7 +1100,8 @@ return (
                                     </>
                                   ) : (
                                     <>
-                                      <TrashIcon className="h-3 w-3" />
+                                      <TrashIcon className="h-3 w-3 sm:h-3 sm:w-3" />
+                                      <span className="hidden xs:inline ml-1">Delete</span>
                                     </>
                                   )}
                                 </button>
@@ -1103,6 +1112,7 @@ return (
                       })}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               ) : (
                 <div className="text-center py-6 sm:py-8">

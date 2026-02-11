@@ -212,16 +212,19 @@ const AdminManagement: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 space-y-4 sm:space-y-0">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-3 sm:space-y-0">
+        <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Admin Management</h1>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center px-3 py-2 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
-          >
-            <UserPlusIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-            Add Admin
-          </button>
+          <p className="text-gray-600 mt-1 text-sm sm:text-base">Create and manage administrator accounts with different roles and permissions</p>
         </div>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="flex items-center justify-center px-3 py-2 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+        >
+          <UserPlusIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+          Add Admin
+        </button>
+      </div>
 
         {isInitialLoading ? (
           <div className="flex items-center justify-center py-12">
@@ -236,7 +239,78 @@ const AdminManagement: React.FC = () => {
             )}
 
             <div className="bg-white shadow-lg rounded-lg overflow-hidden">
-              <div className="overflow-x-auto">
+              {/* Mobile: Card Layout */}
+              <div className="sm:hidden px-4 py-4 space-y-4">
+                {admins.map((admin) => (
+                  <div key={admin._id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <div className="space-y-3">
+                      {/* Admin Info */}
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-gray-900 mb-1">{admin.username}</div>
+                          <div className="flex flex-wrap gap-1">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              admin.role === 'super_admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              {admin.role === 'super_admin' ? 'Super Admin' : 'Admin'}
+                            </span>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              admin.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                            }`}>
+                              {admin.isActive ? 'Active' : 'Inactive'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Created Date */}
+                      <div className="text-xs text-gray-500">
+                        Created: {new Date(admin.createdAt).toLocaleDateString()}
+                      </div>
+                      
+                      {/* Action Buttons */}
+                      <div className="flex gap-2 pt-2 border-t border-gray-200">
+                        <button
+                          onClick={() => handleEdit(admin)}
+                          className="flex-1 flex items-center justify-center px-2 py-2 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-lg transition-all duration-200 text-xs font-medium touch-manipulation"
+                          title="Edit Admin"
+                        >
+                          <PencilIcon className="w-3 h-3 mr-1" />
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleToggleStatus(admin._id, !admin.isActive)}
+                          className={`flex-1 flex items-center justify-center px-2 py-2 rounded-lg transition-all duration-200 text-xs font-medium touch-manipulation ${
+                            admin.isActive 
+                              ? 'text-yellow-600 hover:text-yellow-900 hover:bg-yellow-50' 
+                              : 'text-green-600 hover:text-green-900 hover:bg-green-50'
+                          }`}
+                          title={admin.isActive ? "Deactivate Admin" : "Activate Admin"}
+                        >
+                          {admin.isActive ? <NoSymbolIcon className="w-3 h-3 mr-1" /> : <ShieldCheckIcon className="w-3 h-3 mr-1" />}
+                          {admin.isActive ? 'Deact' : 'Act'}
+                        </button>
+                        <button
+                          onClick={() => handleDelete(admin._id)}
+                          className="flex-1 flex items-center justify-center px-2 py-2 text-red-600 hover:text-red-900 hover:bg-red-50 rounded-lg transition-all duration-200 text-xs font-medium touch-manipulation"
+                          title="Delete Admin"
+                        >
+                          <TrashIcon className="w-3 h-3 mr-1" />
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {admins.length === 0 && !isInitialLoading && (
+                  <div className="text-center py-8 text-gray-500">
+                    <p className="text-sm font-medium">No admin accounts found. Create your first admin to get started.</p>
+                  </div>
+                )}
+              </div>
+              
+              {/* Desktop/Tablet: Table Layout */}
+              <div className="hidden sm:block overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
@@ -289,7 +363,7 @@ const AdminManagement: React.FC = () => {
                           <div className="flex space-x-1 sm:space-x-2">
                             <button
                               onClick={() => handleEdit(admin)}
-                              className="text-blue-600 hover:text-blue-900 p-1"
+                              className="text-blue-600 hover:text-blue-900 p-1 hover:bg-blue-50 rounded transition-colors"
                             >
                               <PencilIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                             </button>
@@ -297,7 +371,7 @@ const AdminManagement: React.FC = () => {
                               onClick={() => handleToggleStatus(admin._id, !admin.isActive)}
                               className={`${
                                 admin.isActive ? 'text-yellow-600 hover:text-yellow-900' : 'text-green-600 hover:text-green-900'
-                              } p-1`}
+                              } p-1 hover:bg-yellow-50 rounded transition-colors`}
                             >
                               {admin.isActive ? (
                                 <NoSymbolIcon className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -307,7 +381,7 @@ const AdminManagement: React.FC = () => {
                             </button>
                             <button
                               onClick={() => handleDelete(admin._id)}
-                              className="text-red-600 hover:text-red-900 p-1"
+                              className="text-red-600 hover:text-red-900 p-1 hover:bg-red-50 rounded transition-colors"
                             >
                               <TrashIcon className="w-3 h-3 sm:w-4 sm:h-4" />
                             </button>
@@ -317,12 +391,12 @@ const AdminManagement: React.FC = () => {
                     ))}
                   </tbody>
                 </table>
+                {admins.length === 0 && !isInitialLoading && (
+                  <div className="text-center py-8 text-gray-500">
+                    No admin accounts found. Create your first admin to get started.
+                  </div>
+                )}
               </div>
-              {admins.length === 0 && !isInitialLoading && (
-                <div className="text-center py-8 text-gray-500">
-                  No admin accounts found. Create your first admin to get started.
-                </div>
-              )}
             </div>
           </>
         )}
@@ -395,7 +469,7 @@ const AdminManagement: React.FC = () => {
                   </select>
                 </div>
 
-                <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3 pt-2">
+                <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-3 pt-4">
                   <button
                     type="button"
                     onClick={() => {
@@ -403,26 +477,16 @@ const AdminManagement: React.FC = () => {
                       setEditingAdmin(null);
                       setFormData({ username: '', password: '', role: 'admin' });
                     }}
-                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 text-sm"
+                    className="w-full sm:w-auto px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors font-medium touch-manipulation"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed touch-manipulation"
                   >
-                    {isLoading ? (
-                      <span className="flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white mr-2"></div>
-                        Processing...
-                      </span>
-                    ) : (
-                      <span className="flex items-center justify-center">
-                        <KeyIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
-                        {editingAdmin ? 'Update' : 'Create'}
-                      </span>
-                    )}
+                    {isLoading ? 'Creating...' : (editingAdmin ? 'Update Admin' : 'Create Admin')}
                   </button>
                 </div>
               </form>

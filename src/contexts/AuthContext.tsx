@@ -122,6 +122,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     delete axios.defaults.headers.common['Authorization'];
     
     const endpoint = isSuperAdmin ? '/api/auth/super-admin-login' : '/api/auth/login';
+    console.log('AuthContext - Using endpoint:', endpoint);
+    console.log('AuthContext - isSuperAdmin:', isSuperAdmin);
+    console.log('AuthContext - Username:', username);
+    
     const response = await axios.post(getApiUrl(endpoint), {
       username,
       password

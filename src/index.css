@@ -48,6 +48,21 @@
   transition: transform 0.1s ease-in-out;
 }
 
+/* Scrollbar Hide Utility */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* Internet Explorer 10+ */
+  scrollbar-width: none;     /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Safari and Chrome */
+}
+
+/* Touch Pan X for better horizontal scrolling */
+.touch-pan-x {
+  touch-action: pan-x;
+}
+
 .active-scale:active {
   transform: scale(0.95);
 }

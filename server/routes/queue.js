@@ -372,10 +372,17 @@ router.post('/next/:windowNumber', authMiddleware, async (req, res) => {
           service: nextQueue.service
         });
 
-        global.io.emit('soundNotification', {
+        // Emit queueServed event for PublicDisplay announcements
+        global.io.emit('queueServed', {
           queueNumber: nextQueue.queueNumber,
           windowNumber: parseInt(windowNumber)
         });
+
+        // Sound notification removed - announcements now handled by queueServed event
+        // global.io.emit('soundNotification', {
+        //   queueNumber: nextQueue.queueNumber,
+        //   windowNumber: parseInt(windowNumber)
+        // });
       }
 
       res.json({
@@ -645,10 +652,17 @@ router.post('/next-queue/:windowNumber', async (req, res) => {
       
       // Emit sound notification for new queue
       if (updatedQueue) {
-        global.io.emit('soundNotification', {
+        // Emit queueServed event for PublicDisplay announcements
+        global.io.emit('queueServed', {
           queueNumber: updatedQueue.queueNumber,
           windowNumber: windowNum
         });
+
+        // Sound notification removed - announcements now handled by queueServed event
+        // global.io.emit('soundNotification', {
+        //   queueNumber: updatedQueue.queueNumber,
+        //   windowNumber: windowNum
+        // });
       }
     }
     

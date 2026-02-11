@@ -36,11 +36,19 @@ const AdminLogin: React.FC = () => {
     setIsLoading(true);
     setError('');
 
+    // Debug: Check environment variables
+    console.log('Frontend - SUPERADMIN_USERNAME:', SUPERADMIN_USERNAME);
+    console.log('Frontend - SUPERADMIN_PASSWORD:', SUPERADMIN_PASSWORD ? 'SET' : 'NOT SET');
+    console.log('Frontend - Input username:', username);
+    console.log('Frontend - Input password:', password ? 'SET' : 'NOT SET');
+
     try {
       // Detect if this is a superadmin login (only if env vars are set)
       const isSuperAdmin = SUPERADMIN_USERNAME && SUPERADMIN_PASSWORD && 
         username.toLowerCase() === SUPERADMIN_USERNAME.toLowerCase() && 
         password === SUPERADMIN_PASSWORD;
+      
+      console.log('Frontend - isSuperAdmin detected:', isSuperAdmin);
       
       const result = await login(username, password, isSuperAdmin);
       

@@ -387,13 +387,10 @@ const PublicDisplay: React.FC = () => {
     newSocket.on('queueServed', (data: { queueNumber: string, windowNumber: number }) => {
       console.log(`🔔 Queue served: ${data.queueNumber} at Window ${data.windowNumber}`);
       
-      // Check if this is current queue being served
-      const currentQueue = currentQueues.find(q => q.queueNumber === data.queueNumber);
-      if (currentQueue && currentQueue.status === 'serving') {
-        playSound(); // Play sound when queue is served
-        // Queue announcement with high priority
-        queueAnnouncement(data.queueNumber, data.windowNumber, false, 5);
-      }
+      // Always play sound and announce when queueServed event is received
+      playSound(); // Play sound when queue is served
+      // Queue announcement with high priority
+      queueAnnouncement(data.queueNumber, data.windowNumber, false, 5);
     });
 
     newSocket.on('newQueues', (data: any) => {
