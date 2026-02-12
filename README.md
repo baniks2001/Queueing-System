@@ -1,6 +1,34 @@
 # Queue Management System
 
-A comprehensive queue management system built with React + TypeScript + Vite frontend and Node.js + Express + MongoDB backend. This system allows organizations to manage customer queues efficiently with real-time updates and sound notifications.
+A comprehensive enterprise-grade queue management system built with React + TypeScript + Vite frontend and Node.js + Express + MongoDB backend. This professional solution enables organizations to manage customer queues efficiently with real-time updates, audio announcements, and multi-device accessibility.
+
+## 📋 Table of Contents
+1. [System Overview](#system-overview)
+2. [Features](#features)
+3. [System Architecture](#system-architecture)
+4. [User Guides](#user-guides)
+5. [Installation & Setup](#installation--setup)
+6. [Configuration](#configuration)
+7. [API Documentation](#api-documentation)
+8. [Database Schema](#database-schema)
+9. [System Flows](#system-flows)
+10. [Security Features](#security-features)
+11. [Development](#development)
+12. [Deployment](#deployment)
+13. [Troubleshooting](#troubleshooting)
+14. [Support](#support)
+
+## System Overview
+
+The Queue Management System is a production-ready enterprise solution designed to streamline customer service operations. It provides a complete ecosystem for managing customer queues across multiple service windows with real-time synchronization and professional reporting capabilities.
+
+### Key Components
+- **Public Kiosk**: Customer self-service interface for queue generation
+- **Admin Dashboard**: Centralized system management and analytics
+- **Window Dashboards**: Individual service provider interfaces
+- **Public Display**: Real-time queue information board with audio
+- **Backend API**: RESTful services with real-time WebSocket support
+- **Database**: MongoDB Atlas cloud storage with optimized schemas
 
 ## Features
 
@@ -71,6 +99,43 @@ A comprehensive queue management system built with React + TypeScript + Vite fro
                     │ • Settings      │
                     └─────────────────┘
 ```
+
+## User Guides
+
+### 📖 [Client Guide](./docs/CLIENT_GUIDE.md)
+Complete guide for end users and customers using the queue system:
+- How to generate queue numbers
+- Understanding priority categories
+- Reading queue displays
+- What to expect when called
+
+### 👥 [Staff Guide](./docs/STAFF_GUIDE.md)
+Comprehensive guide for window operators and service staff:
+- Login and dashboard navigation
+- Queue management procedures
+- Audio announcement controls
+- Handling special cases
+
+### 🔧 [Admin Guide](./docs/ADMIN_GUIDE.md)
+Detailed instructions for system administrators:
+- User management and permissions
+- Service configuration
+- Queue monitoring and analytics
+- System settings and maintenance
+
+### 👑 [Super Admin Guide](./docs/SUPER_ADMIN_GUIDE.md)
+Advanced guide for system super administrators:
+- Complete system control
+- Database management
+- Advanced configuration
+- Security and backup procedures
+
+### 💻 [Developer Guide](./docs/DEVELOPER_GUIDE.md)
+Technical documentation for developers:
+- Code architecture and structure
+- API development and customization
+- Database schema modifications
+- Deployment and maintenance
 
 ## Installation & Setup
 
@@ -312,6 +377,36 @@ The system automatically detects your network IP and configures access for all c
 - **Nodemailer 6.9.7** - Email sending capabilities
 - **Dotenv 16.3.1** - Environment variable management
 
+## System Flows
+
+### 📋 [Complete System Flows Documentation](./SYSTEM_FLOWS.md)
+Detailed documentation of all system processes and workflows:
+- User authentication flows
+- Queue generation and processing
+- Transaction flow execution
+- Real-time communication patterns
+- Error handling procedures
+- Data flow architecture
+
+## Database Schema
+
+### 🗄️ Database Collections
+The system uses MongoDB Atlas with the following collections:
+
+#### Core Collections
+- **queues** - Active and historical queue records
+- **users** - System user accounts and permissions
+- **admins** - Administrative user accounts
+- **services** - Available services and configurations
+- **transactionFlows** - Multi-step service workflows
+- **transactionHistory** - Completed transaction records
+- **personTypes** - Priority category definitions
+- **onHoldQueues** - Temporary queue holds
+- **kioskStatus** - System status and configuration
+
+#### Schema Details
+Each collection is optimized for performance with proper indexing, validation rules, and relationships. See the [Developer Guide](./docs/DEVELOPER_GUIDE.md) for detailed schema documentation.
+
 ## Project Structure
 
 ```
@@ -365,6 +460,12 @@ queueing-system/
 │   ├── server.js             # Main server application
 │   ├── seed.js               # Database seeding script
 │   └── .env                 # Environment variables
+├── docs/                      # Documentation guides
+│   ├── CLIENT_GUIDE.md       # End user guide
+│   ├── STAFF_GUIDE.md        # Staff operator guide
+│   ├── ADMIN_GUIDE.md        # System admin guide
+│   ├── SUPER_ADMIN_GUIDE.md  # Super admin guide
+│   └── DEVELOPER_GUIDE.md    # Developer documentation
 ├── public/                    # Static public files
 ├── uploads/                   # File upload directory
 ├── package.json              # Frontend dependencies
