@@ -128,38 +128,24 @@ router.post('/generate', async (req, res) => {
       }
     }
 
-    // Get the queue number that should be assigned based on position
-    let queueNumberToAssign;
-    if (insertPosition >= waitingQueues.length) {
-      // This queue goes at the end, get next number
-      const lastQueue = await Queue.findOne({ service: transactionName })
-        .sort({ createdAt: -1 });
-      
-      let nextNumber = 1;
-      if (lastQueue) {
-        const lastNumber = parseInt(lastQueue.queueNumber.replace(prefix, ''));
-        nextNumber = lastNumber + 1;
+    // Get the next global queue number (001-999 sequence shared across all services)
+    let nextNumber = 1;
+    
+    // Find the last queue across ALL services to get the global sequence
+    const lastGlobalQueue = await Queue.findOne({})
+      .sort({ createdAt: -1 });
+    
+    if (lastGlobalQueue) {
+      // Extract the numeric part from the last queue number (remove prefix)
+      const lastNumberMatch = lastGlobalQueue.queueNumber.match(/\d+/);
+      if (lastNumberMatch) {
+        let lastNumber = parseInt(lastNumberMatch[0]);
+        // Reset to 001 if we reach 999
+        nextNumber = lastNumber >= 999 ? 1 : lastNumber + 1;
       }
-      queueNumberToAssign = `${prefix}${nextNumber.toString().padStart(3, '0')}`;
-    } else {
-      // This queue needs to be inserted, use a different approach
-      // Instead of shifting existing queues, we'll assign a new number at the end
-      // and insert the record in the database with the correct logical position
-      
-      // Get the highest queue number for this service
-      const lastQueue = await Queue.findOne({ service: transactionName })
-        .sort({ createdAt: -1 });
-      
-      let nextNumber = 1;
-      if (lastQueue) {
-        const lastNumber = parseInt(lastQueue.queueNumber.replace(prefix, ''));
-        nextNumber = lastNumber + 1;
-      }
-      queueNumberToAssign = `${prefix}${nextNumber.toString().padStart(3, '0')}`;
-      
-      // Note: The fair positioning will be handled at the database query level
-      // when fetching waiting queues, not by manipulating queue numbers
     }
+    
+    queueNumberToAssign = `${prefix}${nextNumber.toString().padStart(3, '0')}`;
 
     // Create the queue with transaction flow information
     const queue = new Queue({
