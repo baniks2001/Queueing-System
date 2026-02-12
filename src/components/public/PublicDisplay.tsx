@@ -31,6 +31,8 @@ const PublicDisplay: React.FC = () => {
   const [announcementHistory, setAnnouncementHistory] = useState<Map<string, {count: number, lastAnnounced: number}>>(new Map());
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'reconnecting'>('disconnected');
   const [customMessages, setCustomMessages] = useState<Map<string, string>>(new Map());
+  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
+  const [audioInitialized, setAudioInitialized] = useState(false);
   
   const navigate = useNavigate();
 
@@ -79,42 +81,80 @@ const PublicDisplay: React.FC = () => {
     }
   };
 
+  // Initialize audio context on first user interaction
+  const initializeAudio = () => {
+    if (!audioInitialized && typeof window !== 'undefined' && window.AudioContext) {
+      const context = new (window.AudioContext || (window as any).webkitAudioContext)();
+      setAudioContext(context);
+      setAudioInitialized(true);
+      
+      // Resume context if suspended (browser autoplay policy)
+      if (context.state === 'suspended') {
+        context.resume();
+      }
+      
+      console.log('🔊 Audio context initialized');
+    }
+  };
+
   // Play AI-like synthetic sound notification
   const playSound = () => {
     try {
-      // Check if audio context is available
-      if (typeof window !== 'undefined' && window.AudioContext) {
-        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-        
-        // Create oscillator for beep sound
-        const oscillator = audioContext.createOscillator();
-        oscillator.type = 'sine';
-        oscillator.frequency.value = 800; // 800 Hz beep
-        
-        // Create gain node for volume control
-        const gainNode = audioContext.createGain();
-        gainNode.gain.value = 0.3; // 30% volume
-        
-        // Connect nodes
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        
-        // Play beep
-        oscillator.start();
-        
-        // Stop after 200ms
-        setTimeout(() => {
-          oscillator.stop();
-          oscillator.disconnect();
-          gainNode.disconnect();
-        }, 200);
-        
-        console.log('🔊 Sound played (online mode)');
+      // Initialize audio if not done yet
+      if (!audioInitialized) {
+        initializeAudio();
+        // Try again after initialization
+        setTimeout(() => playSound(), 100);
+        return;
+      }
+
+      if (audioContext) {
+        // Resume context if suspended (browser autoplay policy)
+        if (audioContext.state === 'suspended') {
+          audioContext.resume().then(() => {
+            console.log('🔊 Audio context resumed');
+            createBeepSound(audioContext);
+          });
+        } else {
+          createBeepSound(audioContext);
+        }
       } else {
         console.log('🔇 Audio context not available, sound disabled (offline mode)');
       }
     } catch (error) {
       console.error('Error creating synthetic sound:', error);
+    }
+  };
+
+  // Create beep sound using existing audio context
+  const createBeepSound = (context: AudioContext) => {
+    try {
+      // Create oscillator for beep sound
+      const oscillator = context.createOscillator();
+      oscillator.type = 'sine';
+      oscillator.frequency.value = 800; // 800 Hz beep
+      
+      // Create gain node for volume control
+      const gainNode = context.createGain();
+      gainNode.gain.value = 0.3; // 30% volume
+      
+      // Connect nodes
+      oscillator.connect(gainNode);
+      gainNode.connect(context.destination);
+      
+      // Play beep
+      oscillator.start();
+      
+      // Stop after 200ms
+      setTimeout(() => {
+        oscillator.stop();
+        oscillator.disconnect();
+        gainNode.disconnect();
+      }, 200);
+      
+      console.log('🔊 Sound played successfully');
+    } catch (error) {
+      console.error('Error creating beep sound:', error);
     }
   };
 
@@ -486,6 +526,15 @@ const PublicDisplay: React.FC = () => {
     }
   }, [currentQueues, waitingQueues]);
 
+  // Cleanup audio context on unmount
+  useEffect(() => {
+    return () => {
+      if (audioContext) {
+        audioContext.close();
+      }
+    };
+  }, [audioContext]);
+
   const fetchKioskTitle = async () => {
     try {
       const response = await axios.get(getApiUrl('/api/kiosk/status'));
@@ -561,18 +610,19 @@ const PublicDisplay: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 safe-area">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 safe-area" onClick={initializeAudio}>
       {/* Top Bar - Dark Blue */}
-      <div className="bg-blue-800 shadow-lg border-b border-blue-700 fixed top-0 left-0 right-0 z-50 safe-area-top">
-        <div className="container mx-auto max-w-7xl px-2 sm:px-3 py-1 tv-optimized">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
+      <header className="bg-gradient-to-r from-blue-900 to-blue-800 shadow-lg border-b border-blue-700">
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6">
+          <div className="flex justify-between items-center py-2 sm:py-3">
+            {/* Left side - Logo and Title */}
+            <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
               {/* Logo */}
               {logo && (
                 <img 
                   src={getUploadUrl(logo)} 
                   alt="Government Office Logo" 
-                  className="h-6 w-6 sm:h-8 sm:w-8 lg:h-10 lg:w-10 object-contain"
+                  className="h-8 w-8 sm:h-8 sm:w-8 lg:h-10 lg:w-10 object-contain flex-shrink-0"
                   onError={(e) => {
                     console.error('Logo failed to load in PublicDisplay:', getUploadUrl(logo));
                     e.currentTarget.style.display = 'none';
@@ -581,41 +631,38 @@ const PublicDisplay: React.FC = () => {
               )}
               
               {/* Government Office Name and Title */}
-              <div className="tv-optimized">
-                <div className="text-xs text-blue-100">
+              <div className="min-w-0 flex-1">
+                <div className="text-xs text-blue-200 truncate sm:whitespace-normal">
                   {governmentOfficeName}
                 </div>
-                <h1 className="text-xs sm:text-sm lg:text-lg font-bold text-white tv-optimized">
+                <h1 className="text-sm sm:text-lg lg:text-xl font-bold text-white truncate sm:whitespace-normal">
                   {kioskTitle}
                 </h1>
-                {/* Connection Status Indicator */}
-                <div className="flex items-center space-x-2 mt-0">
-                  <div className={`w-2 h-2 rounded-full ${
-                    connectionStatus === 'connected' ? 'bg-green-400' : 
-                    connectionStatus === 'reconnecting' ? 'bg-yellow-400 animate-pulse' : 'bg-red-400'
-                  }`} />
-                  <span className="text-xs text-blue-200">
-                    {connectionStatus === 'connected' ? 'Connected' : 
-                     connectionStatus === 'reconnecting' ? 'Reconnecting...' : 'Disconnected'}
-                  </span>
-                  {isAnnouncing && (
-                    <span className="text-xs text-green-300 animate-pulse ml-2">
-                      🔊 Announcing...
-                    </span>
-                  )}
-                </div>
               </div>
             </div>
             
-            <div className="flex items-center space-x-4">
-              {/* Date and Time - Responsive */}
-              <div className="flex items-center space-x-2 text-white tv-optimized">
-                <ClockIcon className="w-3 h-3 sm:w-3 sm:h-3 lg:w-4 lg:h-4" />
-                <div className="text-right">
-                  <div className="text-xs font-bold">
+            {/* Right side - Controls */}
+            <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
+              {/* Connection Status */}
+              <div className="hidden sm:flex items-center space-x-2">
+                <div className={`w-2 h-2 rounded-full ${
+                  connectionStatus === 'connected' ? 'bg-green-400' : 
+                  connectionStatus === 'reconnecting' ? 'bg-yellow-400 animate-pulse' : 'bg-red-400'
+                }`} />
+                <span className="text-xs text-blue-200">
+                  {connectionStatus === 'connected' ? 'Connected' : 
+                   connectionStatus === 'reconnecting' ? 'Reconnecting...' : 'Disconnected'}
+                </span>
+              </div>
+              
+              {/* Date and Time */}
+              <div className="flex items-center text-white">
+                <ClockIcon className="w-4 h-4 sm:w-4 sm:h-4 lg:w-5 lg:h-5" />
+                <div className="text-right ml-1">
+                  <div className="text-xs sm:text-sm font-bold">
                     {currentTime.toLocaleTimeString()}
                   </div>
-                  <div className="text-xs text-blue-100">
+                  <div className="text-xs text-blue-200 hidden lg:block">
                     {currentTime.toLocaleDateString('en-US', {
                       weekday: 'short', year: 'numeric', month: 'short', day: 'numeric'
                     })}
@@ -623,27 +670,36 @@ const PublicDisplay: React.FC = () => {
                 </div>
               </div>
               
+              {/* Mobile Announcement Indicator */}
+              {isAnnouncing && (
+                <div className="sm:hidden flex items-center">
+                  <span className="text-xs text-green-300 animate-pulse">
+                    🔊
+                  </span>
+                </div>
+              )}
+              
               {/* Settings Dropdown */}
               <div className="relative">
                 <button
-                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="p-2 rounded-lg hover:bg-blue-700 transition-colors touch-manipulation active-scale"
+                  onClick={() => { initializeAudio(); setIsDropdownOpen(!isDropdownOpen); }}
+                  className="flex items-center justify-center p-2 rounded-lg hover:bg-blue-700 transition-colors touch-manipulation active-scale"
                   aria-label="Settings menu"
                   aria-expanded={isDropdownOpen}
                 >
-                  <CogIcon className="w-3 h-3 sm:w-4 sm:h-4 lg:w-5 lg:h-5 text-white" />
+                  <CogIcon className="w-5 h-5 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-white" />
                 </button>
                 {isDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden">
                     <button
-                      onClick={() => { setIsDropdownOpen(false); toggleFullscreen(); }}
+                      onClick={() => { initializeAudio(); setIsDropdownOpen(false); toggleFullscreen(); }}
                       className="w-full text-left px-3 py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-100 flex items-center"
                     >
                       <ArrowsPointingOutIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
                       {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
                     </button>
                     <button
-                      onClick={() => { setIsDropdownOpen(false); navigate('/'); }}
+                      onClick={() => { initializeAudio(); setIsDropdownOpen(false); navigate('/'); }}
                       className="w-full text-left px-3 py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-100 flex items-center"
                     >
                       <ArrowLeftIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
@@ -655,11 +711,11 @@ const PublicDisplay: React.FC = () => {
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
       {/* Main Content */}
-      <div className="h-screen pt-12">
-        <div className="container mx-auto max-w-7xl px-2 sm:px-3 py-2 h-full">
+      <main className="min-h-screen py-4">
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6">
           
           {/* Side-by-side layout */}
           <div className="flex flex-col lg:flex-row gap-2 lg:gap-3 justify-center items-start h-full">
@@ -1073,7 +1129,7 @@ const PublicDisplay: React.FC = () => {
             </div>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 };

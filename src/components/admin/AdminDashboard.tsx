@@ -47,8 +47,30 @@ interface TransactionHistory {
 }
 
 const AdminDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const { showSuccess, showError, showWarning } = useToast();
+
+  // Define tabs first
+  const tabs = [
+    { id: 'dashboard', name: 'Dashboard', icon: QueueListIcon, superAdminOnly: false },
+    { id: 'users', name: 'User Management', icon: UsersIcon, superAdminOnly: false },
+    { id: 'admins', name: 'Admin Management', icon: CogIcon, superAdminOnly: true },
+    { id: 'flow', name: 'Transaction Flow', icon: WrenchScrewdriverIcon, superAdminOnly: false },
+    { id: 'queues', name: 'Queue Management', icon: TicketIcon, superAdminOnly: false }
+  ];
+
+  const filteredTabs = tabs.filter(tab => !tab.superAdminOnly || user?.role === 'super_admin');
+
+  // Initialize activeTab from localStorage to prevent flicker and maintain state on refresh
+  const getInitialTab = () => {
+    const savedTab = localStorage.getItem('adminActiveTab');
+    return savedTab && filteredTabs.some(tab => tab.id === savedTab) ? savedTab : 'dashboard';
+  };
+
+  const [activeTab, setActiveTab] = useState(getInitialTab);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
   const [stats, setStats] = useState<AdminStats>({
     totalUsers: 0,
     activeUsers: 0,
@@ -70,26 +92,21 @@ const AdminDashboard: React.FC = () => {
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
   const [closeModalData, setCloseModalData] = useState<any>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<TransactionHistory | null>(null);
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
-  const { showSuccess, showError, showWarning } = useToast();
-
-  // Define tabs first
-  const tabs = [
-    { id: 'dashboard', name: 'Dashboard', icon: QueueListIcon, superAdminOnly: false },
-    { id: 'users', name: 'User Management', icon: UsersIcon, superAdminOnly: false },
-    { id: 'admins', name: 'Admin Management', icon: CogIcon, superAdminOnly: true },
-    { id: 'flow', name: 'Transaction Flow', icon: WrenchScrewdriverIcon, superAdminOnly: false },
-    { id: 'queues', name: 'Queue Management', icon: TicketIcon, superAdminOnly: false }
-  ];
-
-  const filteredTabs = tabs.filter(tab => !tab.superAdminOnly || user?.role === 'super_admin');
 
   useEffect(() => {
     fetchStats();
     fetchKioskStatus();
     fetchTransactionHistory();
+    // Mark as initialized after initial data load
+    setIsInitialized(true);
   }, []);
+
+  // Save activeTab to localStorage whenever it changes
+  useEffect(() => {
+    if (isInitialized) {
+      localStorage.setItem('adminActiveTab', activeTab);
+    }
+  }, [activeTab, isInitialized]);
 
   const fetchStats = async () => {
     try {
@@ -1231,11 +1248,20 @@ const AdminDashboard: React.FC = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <div>
-          {activeTab === 'dashboard' && renderDashboard()}
-          {activeTab === 'users' && <UserManagement />}
-          {activeTab === 'admins' && <AdminManagement />}
-          {activeTab === 'flow' && <ServiceManagement />}
-          {activeTab === 'queues' && <QueueManagement />}
+          {isInitialized && (
+            <>
+              {activeTab === 'dashboard' && renderDashboard()}
+              {activeTab === 'users' && <UserManagement />}
+              {activeTab === 'admins' && <AdminManagement />}
+              {activeTab === 'flow' && <ServiceManagement />}
+              {activeTab === 'queues' && <QueueManagement />}
+            </>
+          )}
+          {!isInitialized && (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          )}
         </div>
       </div>
     </div>
